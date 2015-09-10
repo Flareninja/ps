@@ -113,25 +113,15 @@ exports.Formats = [
 		],
 		section: "ORAS Singles",
 
-		searchShow: false,
 		maxLevel: 5,
 		ruleset: ['Pokemon', 'Standard', 'Team Preview', 'Little Cup'],
 		banlist: ['LC Uber', 'Gligar', 'Misdreavus', 'Scyther', 'Sneasel', 'Tangela', 'Dragon Rage', 'Sonic Boom', 'Swagger']
 	},
 	{
-		name: "LC (suspect test)",
-		desc: ["&bullet; <a href=\"https://www.smogon.com/forums/threads/3547829/\">LC Suspect</a>"],
-		section: "ORAS Singles",
-
-		challengeShow: false,
-		maxLevel: 5,
-		ruleset: ['LC']
-	},
-	{
 		name: "Anything Goes",
 		desc: [
 			"&bullet; <a href=\"https://www.smogon.com/forums/threads/3523229/\">Anything Goes</a>",
-			"&bullet; <a href=\"https://www.smogon.com/forums/threads/3535064/\">Anything Goes Viability Ranking</a>"
+			"&bullet; <a href=\"https://www.smogon.com/forums/threads/3548945/\">Anything Goes Resources</a>"
 		],
 		section: "ORAS Singles",
 
@@ -424,7 +414,16 @@ exports.Formats = [
 		column: 2,
 
 		ruleset: ['OU'],
-	          banlist: ['Allow One Sketch', "King's Rock", 'Pinsirite', 'Razor Fang', 'Shadow Tag']
+		banlist: ['Allow One Sketch', "King's Rock", 'Pinsirite', 'Razor Fang', 'Shadow Tag'],
+		onValidateTeam: function (team) {
+			var sketchedMoves = {};
+			for (var i = 0; i < team.length; i++) {
+				var move = team[i].sketchmonsMove;
+				if (!move) continue;
+				if (move in sketchedMoves) return ["You are limited to sketching one of each move by Move Clause.", "(You have sketched " + this.getMove(move).name + " more than once)"];
+				sketchedMoves[move] = (team[i].name || team[i].species);
+			}
+		}
 	},
 	{
 		name: "Hackmons 1v1",
@@ -701,7 +700,7 @@ exports.Formats = [
 			'Charizardite X', 'Charizardite Y', 'Garchompite', 'Gardevoirite', 'Gyaradosite', 'Latiasite', 'Latiosite', 'Lucarionite',
 			'Tyranitarite', 'Venusaurite'
 		],
-	onValidateTeam: function (team, format) {
+		onValidateTeam: function (team, format) {
 			var template = this.getTemplate(team.species);
 			var problems = [];
 			if (team.length > 1) problems.push('You may only bring one Pokémon.');
@@ -709,7 +708,7 @@ exports.Formats = [
 			if (team[0].level && team[0].level < 100) problems.push((team[0].name || team[0].species) + ' is lower than level 100.');
 			return problems;
 		},
-	onValidateSet: function (set, format) {
+		onValidateSet: function (set, format) {
 			var template = this.getTemplate(set.species);
 			var problems = [];
 			var baseStats = 0;
