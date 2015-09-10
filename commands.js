@@ -387,8 +387,17 @@ var commands = exports.commands = {
 				targetRoom.isPrivate = true;
 				targetRoom.chatRoomData.isPrivate = true;
 				Rooms.global.writeChatRoomData();
+				if (Rooms('upperstaff')) {
+					Rooms('upperstaff').add('|raw|<div class="broadcast-green">Private chat room created: <b>' + Tools.escapeHTML(target) + '</b></div>').update();
+				}
 				return this.sendReply("The private chat room '" + target + "' was created.");
 			} else {
+				if (Rooms('staff')) {
+					Rooms('staff').add('|raw|<div class="broadcast-green">Public chat room created: <b>' + Tools.escapeHTML(target) + '</b></div>').update();
+				}
+				if (Rooms('upperstaff')) {
+					Rooms('upperstaff').add('|raw|<div class="broadcast-green">Public chat room created: <b>' + Tools.escapeHTML(target) + '</b></div>').update();
+				}
 				return this.sendReply("The chat room '" + target + "' was created.");
 			}
 		}
@@ -440,6 +449,9 @@ var commands = exports.commands = {
 				Rooms.global.writeChatRoomData();
 			}
 		} else {
+			if (room.isPrivate === setting) {
+				return this.errorReply("This room is already " + (setting === true ? 'secret' : setting) + ".");
+			}
 			room.isPrivate = setting;
 			this.addModCommand("" + user.name + " made this room " + (setting === true ? 'secret' : setting) + ".");
 			if (room.chatRoomData) {
@@ -567,21 +579,20 @@ var commands = exports.commands = {
 	},
 
 	roomalias: function (target, room, user) {
-		if (!room.chatRoomData) return this.sendReply("This room isn't designed for aliases.");
 		if (!target) {
 			if (!this.canBroadcast()) return;
-			if (!room.chatRoomData.aliases || !room.chatRoomData.aliases.length) return this.sendReplyBox("This room does not have any aliases.");
-			return this.sendReplyBox("This room has the following aliases: " + room.chatRoomData.aliases.join(", ") + "");
+			if (!room.aliases || !room.aliases.length) return this.sendReplyBox("This room does not have any aliases.");
+			return this.sendReplyBox("This room has the following aliases: " + room.aliases.join(", ") + "");
 		}
 		if (!this.can('setalias')) return false;
 		var alias = toId(target);
 		if (!alias.length) return this.sendReply("Only alphanumeric characters are valid in an alias.");
 		if (Rooms.get(alias) || Rooms.aliases[alias]) return this.sendReply("You cannot set an alias to an existing room or alias.");
 
-		Rooms.aliases[alias] = room;
+		Rooms.aliases[alias] = room.id;
 		this.privateModCommand("(" + user.name + " added the room alias '" + target + "'.)");
 
-		if (!room.aliases) room.aliases = room.chatRoomData.aliases || [];
+		if (!room.aliases) room.aliases = [];
 		room.aliases.push(alias);
 		if (room.chatRoomData) {
 			room.chatRoomData.aliases = room.aliases;
@@ -590,19 +601,17 @@ var commands = exports.commands = {
 	},
 
 	removeroomalias: function (target, room, user) {
-		if (!room.chatRoomData) return this.sendReply("This room isn't designed for aliases.");
-		if (!room.chatRoomData.aliases) return this.sendReply("This room does not have any aliases.");
+		if (!room.aliases) return this.sendReply("This room does not have any aliases.");
 		if (!this.can('setalias')) return false;
 		var alias = toId(target);
 		if (!alias.length || !Rooms.aliases[alias]) return this.sendReply("Please specify an existing alias.");
-		if (toId(Rooms.aliases[alias]) !== room.id) return this.sendReply("You may only remove an alias from the current room.");
+		if (Rooms.aliases[alias] !== room.id) return this.sendReply("You may only remove an alias from the current room.");
 
 		this.privateModCommand("(" + user.name + " removed the room alias '" + target + "'.)");
 
-		var aliases = room.aliases || room.chatRoomData.aliases;
-		var aliasIndex = aliases.indexOf(alias);
+		var aliasIndex = room.aliases.indexOf(alias);
 		if (aliasIndex >= 0) {
-			aliases.splice(aliasIndex, 1);
+			room.aliases.splice(aliasIndex, 1);
 			delete Rooms.aliases[alias];
 			Rooms.global.writeChatRoomData();
 		}
@@ -713,11 +722,13 @@ var commands = exports.commands = {
 		if ((room.auth[userid] || Config.groupsranking[0]) === nextGroup) {
 			return this.sendReply("User '" + name + "' is already a " + groupName + " in this room.");
 		}
-		if (currentGroup !== ' ' && !user.can('room' + (Config.groups[currentGroup] ? Config.groups[currentGroup].id : 'voice'), null, room)) {
-			return this.sendReply("/" + cmd + " - Access denied for promoting/demoting from " + (Config.groups[currentGroup] ? Config.groups[currentGroup].name : "an undefined group") + ".");
-		}
-		if (nextGroup !== ' ' && !user.can('room' + Config.groups[nextGroup].id, null, room)) {
-			return this.sendReply("/" + cmd + " - Access denied for promoting/demoting to " + Config.groups[nextGroup].name + ".");
+		if (!user.can('makeroom')) {
+			if (currentGroup !== ' ' && !user.can('room' + (Config.groups[currentGroup] ? Config.groups[currentGroup].id : 'voice'), null, room)) {
+				return this.sendReply("/" + cmd + " - Access denied for promoting/demoting from " + (Config.groups[currentGroup] ? Config.groups[currentGroup].name : "an undefined group") + ".");
+			}
+			if (nextGroup !== ' ' && !user.can('room' + Config.groups[nextGroup].id, null, room)) {
+				return this.sendReply("/" + cmd + " - Access denied for promoting/demoting to " + Config.groups[nextGroup].name + ".");
+			}
 		}
 
 		if (nextGroup === ' ') {
@@ -1445,90 +1456,7 @@ var commands = exports.commands = {
 		}
 	},
 	modchathelp: ["/modchat [off/autoconfirmed/+/%/@/#/&/~] - Set the level of moderated chat. Requires: @ for off/autoconfirmed/+ options, # & ~ for all the options"],
- ccdeclare: 'customcolordeclare',
-	customcolordeclare: function (target, room, user) {
-		if (target.includes(',')) {
-		var targets = target.split(',');
-					targets[0] = targets[0].toLowerCase();
-		if (!target) return this.parse('/help customcolordeclare');
-		if (!this.can('declare', null, room)) return false;
 
-		if (!this.canTalk()) return;
-
-		this.add('|raw|<div style="border-style: ridge; border-color: #000000; border-width: 2px; padding: 5px 5px; background-color:'+ targets[0] +';"><b>' + targets[1] + '</b></div>');
-		this.logModCommand(user.name + " declared " + target);
-	}
-	},
-	advertise: function (target, room, user) {
-	    if (target.includes(',')) {
-		var targets = target.split(',');
-					targets[1] = targets[1].toLowerCase();
-     targets[1] = targets[1].replace(/\s+/g, '');
-		if (!target) return this.parse('/help advertise');
-		if (!this.can('potd', null, room)) return false;
-
-		if (!this.canTalk()) return;
-
-		this.add('|raw|<div style="border-style: ridge; border-width: 5px; border-color:#FFCC00; background-image: url(&quot;http://s4.postimg.org/bcuxqym4d/Pokemon_Charizard_Cartoon_Wallpaper.jpg&quot;) ; background-size: cover ; cursor: url(&quot;http://www.rw-designer.com/cursor-view/7788.gif&quot;) , auto">&nbsp;Advertisement:~<b><center><u><h2><a style="font-family:Papyrus; color:white;" href="/' + targets[1] + '">' + targets[2] + '</a></h2></u></center></b><center><font style="font-family:Verdana; font-size:13px;" color="#FFFFCC"><b>' + targets[3] + '</b></font></center><center><font style="font-family:Comic Sans MS;" color="white"><h3>By: ' + targets[0] + '</font></h3></center></div>');
-		this.logModCommand(user.name + " advertised " + target);
-	}
-	},
-	advertisehelp: ["/advertise [By],[Room Name],[Heading],[message] - Anonymously announces an advertisement. Requires: & ~"],
-
-	advertisevenusaur: function (target, room, user) {
-	    if (target.includes(',')) {
-		var targets = target.split(',');
-					targets[1] = targets[1].toLowerCase();
-     targets[1] = targets[1].replace(/\s+/g, '');
-		if (!target) return this.parse('/help advertisevenusaur');
-		if (!this.can('potd', null, room)) return false;
-
-		if (!this.canTalk()) return;
-
-		this.add('|raw|<div style="border-style: ridge; border-width: 5px; border-color:#FFCC00; background-image: url(&quot;https://pokewalls.files.wordpress.com/2013/09/megavenusaur1920x1200.jpg?w=400&quot;) ; background-size: cover ; cursor: url(&quot;http://www.rw-designer.com/cursor-view/7788.gif&quot;) , auto">&nbsp;Advertisement:~<b><center><u><h2><a style="font-family:Papyrus; color:black;" href="/' + targets[1] + '">' + targets[2] + '</a></h2></u></center></b><center><font style="font-family:Verdana; font-size:13px;" color="#FFFFCC"><b>' + targets[3] + '</b></font></center><center><font style="font-family:Comic Sans MS;" color="white"><h3>By: ' + targets[0] + '</font></h3></center></div>');
-		this.logModCommand(user.name + " advertised " + target);
-	}
-	},
-	advertisevenusaurhelp: ["/advertisevenusaur [By],[Room Name],[Heading],[message] - Anonymously announces an advertisement. Requires: & ~"],
-
-	advertiseblastoise: function (target, room, user) {
-	    if (target.includes(',')) {
-		var targets = target.split(',');
-					targets[1] = targets[1].toLowerCase();
-     targets[1] = targets[1].replace(/\s+/g, '');
-		if (!target) return this.parse('/help advertiseblastoise');
-		if (!this.can('potd', null, room)) return false;
-
-		if (!this.canTalk()) return;
-
-		this.add('|raw|<div style="border-style: ridge; border-width: 5px; border-color:#FFCC00; background-image: url(&quot;https://pokewalls.files.wordpress.com/2011/06/9blastoise1920x1200.jpg&quot;) ; background-size: cover ; cursor: url(&quot;http://www.rw-designer.com/cursor-view/7788.gif&quot;) , auto">&nbsp;Advertisement:~<b><center><u><h2><a style="font-family:Papyrus; color:red;" href="/' + targets[1] + '">' + targets[2] + '</a></h2></u></center></b><center><font style="font-family:Verdana; font-size:13px;" color="#FFFFCC"><b>' + targets[3] + '</b></font></center><center><font style="font-family:Comic Sans MS;" color="white"><h3>By: ' + targets[0] + '</font></h3></center></div>');
-		this.logModCommand(user.name + " advertised " + target);
-	}
-	},
-	advertiseblastoisehelp: ["/advertiseblastoise [By],[Room Name],[Heading],[message] - Anonymously announces an advertisement. Requires: & ~"],
-
-	declarered: function (target, room, user) {
-		if (!target) return this.parse('/help declare');
-		if (!this.can('declare', null, room)) return false;
-
-		if (!this.canTalk()) return;
-
-		this.add('|raw|<div class="broadcast-red"><b>' + target + '</b></div>');
-		this.logModCommand(user.name + " declared " + target);
-	},
-	declareredhelp: ["/declarered [message] - Anonymously announces a message. Requires: # & ~"],
-declaregreen: function (target, room, user) {
-		if (!target) return this.parse('/help declare');
-		if (!this.can('declare', null, room)) return false;
-
-		if (!this.canTalk()) return;
-
-		this.add('|raw|<div class="broadcast-green"><b>' + target + '</b></div>');
-		this.logModCommand(user.name + " declared " + target);
-	},
-	declareredhelp: ["/declarered [message] - Anonymously announces a message. Requires: # & ~"],
-
-	gdeclare: 'globaldeclare',
 	declare: function (target, room, user) {
 		if (!target) return this.parse('/help declare');
 		if (!this.can('declare', null, room)) return false;
@@ -2298,6 +2226,8 @@ declaregreen: function (target, room, user) {
 
 	addplayer: function (target, room, user) {
 		if (!target) return this.parse('/help addplayer');
+		if (!room.battle) return this.sendReply("You can only do this in battle rooms.");
+		if (room.rated) return this.sendReply("You can only add a Player to unrated battles.");
 
 		target = this.splitTarget(target, true);
 		var userid = toId(this.targetUsername);
@@ -2305,7 +2235,6 @@ declaregreen: function (target, room, user) {
 		var name = this.targetUsername;
 
 		if (!targetUser) return this.sendReply("User " + name + " not found.");
-		if (!room.joinBattle) return this.sendReply("You can only do this in battle rooms.");
 		if (targetUser.can('joinbattle', null, room)) {
 			return this.sendReply("" + name + " can already join battles as a Player.");
 		}
