@@ -1,28 +1,25 @@
-//var sqlite3 = require('sqlite3');
+//var sqlite3 = require('sqlite3'); // sqlite3 doesn't like to be hotpatched so we load it as a global in app.js instead
 var db = new sqlite3.Database('config/users.db', function() {
-	db.run("CREATE TABLE if not exists users (userid TEXT, name TEXT, bucks INTEGER)", function () {
-		db.all("SELECT * FROM users WHERE userid=jd", function (err, rows) {
-			if (err || rows.length < 1) writeMoney('jd', 0);
-		});
-	});
+	db.run("CREATE TABLE if not exists users (userid TEXT, name TEXT, bucks INTEGER)");
 });
 
 var fs = require('fs');
 var http = require('http');
 var MD5 = require('MD5');
 var shopTitle = 'Fireball Shop';
+var serverIp = '52.25.11.220';
 
 var prices = {
 	"customsymbol": 5,
 	"leagueroom": 5,
-	"fix": 10,
+	"fix": 99999999999999,
 	"declare": 15,
 	"poof": 20,
-	"customavatar": 25,
-	"animatedavatar": 35,
-	"infobox": 40,
+	"customavatar": 35,
+	"animatedavatar": 40,
+	"infobox": 75,
 	"leagueshop": 55,
-	"chatroom": 70,
+	"chatroom": 100,
 };
 
 function readMoney(userid, callback) {
@@ -58,6 +55,7 @@ function logTransaction (message) {
 	if (!message) return false;
 	fs.appendFile('logs/transactions.log','['+new Date().toUTCString()+'] '+message+'\n');
 }
+global.logTransaction = logTransaction;
 
 function logDice (message) {
 	if (!message) return false;
@@ -68,6 +66,8 @@ function messageSeniorStaff (message) {
 	for (var u in Users.users) {
 		if (!Users.users[u].connected || !Users.users[u].can('declare')) continue;
 		Users.users[u].send('|pm|~Server|'+Users.users[u].getIdentity()+'|'+message);
+		Rooms('staff').addRaw('<font color="red"><b>SHOP:</b></font> ' + Tools.escapeHTML(message));
+		Rooms('staff').update();
 	}
 }
 
@@ -100,6 +100,8 @@ exports.commands = {
 	},
 
 	atm: 'wallet',
+	purse: 'wallet',
+	fannypack: 'wallet',
 	wallet: function (target, room, user) {
 		if (!target) target = user.name;
 		if (!this.canBroadcast()) return;
@@ -277,11 +279,11 @@ exports.commands = {
 					matched = true;
 					break;
 				case 'leagueshop':
-					if (userMoney < prices[itemid]) return self.sendReply("You need " + (prices[itemid] - userMoney) + " more bucks to purchase a fix.");
+					if (userMoney < prices[itemid]) return self.sendReply("You need " + (prices[itemid] - userMoney) + " more bucks to purchase a league shop.");
 					if (!targetSplit[1]) return self.sendReply("Please specify the room you would like to buy a league shop for with /buy leagueshop, room.");
 					if (!Rooms(toId(targetSplit[1]))) return self.sendReply("That room doesn't exist.");
 	 				var targetRoom = Rooms(targetSplit[1]);
-	 				if (!targetRoom.isLeague) return self.sendReply(targetRoom.title + " isn't a league!");
+	 				
 	 				if (targetRoom.shop) return self.sendReply(targetRoom.title + " already has a league shop!");
 	 				writeMoney(user.userid, prices[itemid] * -1);
 	 				logTransaction(user.name + " has purchased a league shop for " + prices[itemid] + " bucks. Room: " + targetRoom.title);
@@ -317,10 +319,11 @@ exports.commands = {
 	 		'</table><br />To buy an item from the shop, use /buy [item]. <br />Use /currencyhelp to view money-based commands.<br />All sales final, no refunds will be provided.</center>'
 	 	);
 	},
+	
 
 	roomshop: 'leagueshop',
 	leagueshop: function(target, room, user) {
-	 	if (!room.isLeague) return this.sendReply('/leagueshop - This room is not a league.');
+	 
 	 	if (!room.shop) return this.sendReply('/leagueshop - This room does not have a shop, purchase one with /buy leagueshop, ' + room.title);
 	 	if (!room.founder) return this.sendReply('/leagueshop - league shops require a room founder.');
 	 	if (!room.shopList) room.shopList = [];
@@ -526,7 +529,7 @@ exports.commands = {
 	},
 
 	customsymbol: function(target, room, user) {
-	 	var bannedSymbols = ['!', '|', '‽', '\u2030', '\u534D', '\u5350', '\u223C'];
+	 	var bannedSymbols = ['!', '|', 'â€½', '\u2030', '\u534D', '\u5350', '\u223C'];
 	 	for (var u in Config.groups) if (Config.groups[u].symbol) bannedSymbols.push(Config.groups[u].symbol);
 	 	if(!user.canCustomSymbol && !user.can('vip')) return this.sendReply('You need to buy this item from the shop to use.');
 	 	if(!target || target.length > 1) return this.sendReply('/customsymbol [symbol] - changes your symbol (usergroup) to the specified symbol. The symbol can only be one character');
@@ -535,16 +538,21 @@ exports.commands = {
 	 	}
 	 	user.getIdentity = function (roomid) {
 			if (!roomid) roomid = 'lobby';
+			var room = Rooms.rooms[roomid];
 			if (this.locked) {
-				return '‽'+this.name;
+				return 'â€½'+this.name;
 			}
-			if (roomid) {
-				var room = Rooms.rooms[roomid];
-				if (room.isMuted(this)) {
-					return '!' + this.name;
+			if (room.isMuted(user)) {
+				return '!'+this.name;
+			}
+			if (!room) return target + this.name;
+			if (room.auth) {
+				if (room.auth[this.userid]) {
+					return room.auth[this.userid] + this.name;
 				}
+				if (room.isPrivate) return ' ' + this.name;
 			}
-		return target + this.name;
+			return target + this.name;
 		}
 	 	user.updateIdentity();
 	 	user.canCustomSymbol = false;
@@ -735,6 +743,83 @@ exports.commands = {
 			'/joindice - Joins the game.<br />' +
 			'/enddice - Forcibly ends the game.'
 			);
+	},
+
+	profile: function(target, room, user) {
+		if (!target) target = user.name;
+		if (toId(target).length > 19) return this.sendReply("Usernames may not be more than 19 characters long.");
+		if (toId(target).length < 1) return this.sendReply(target + " is not a valid username.");
+		if (!this.canBroadcast()) return;
+		var targetUser = Users.get(target);
+		if (!targetUser) {
+			var username = target;
+			var userid = toId(target);
+			var avatar = (Config.customavatars[userid] ? "http://" + serverIp + ":" + Config.port + "/avatars/" + Config.customavatars[userid] : "http://play.pokemonshowdown.com/sprites/trainers/167.png");
+		} else {
+			var username = targetUser.name;
+			var userid = targetUser.userid;
+			var avatar = (isNaN(targetUser.avatar) ? "http://" + serverIp + ":" + Config.port + "/avatars/" + targetUser.avatar : "http://play.pokemonshowdown.com/sprites/trainers/" + targetUser.avatar + ".png");
+		}
+
+    	if (Users.usergroups[userid]) {
+			var userGroup = Users.usergroups[userid].substr(0,1);
+			for (var u in Config.grouplist) {
+				if (Config.grouplist[u].symbol && Config.grouplist[u].symbol === userGroup) userGroup = Config.grouplist[u].name;
+			}
+		} else {
+			var userGroup = 'Regular User';
+		}
+
+		var self = this;
+		readMoney(userid, function(bucks) {
+			var options = {
+				host: "pokemonshowdown.com",
+				port: 80,
+				path: "/users/" + userid
+			};
+
+			var content = "";
+			var req = http.request(options, function(res) {
+
+				res.setEncoding("utf8");
+				res.on("data", function (chunk) {
+					content += chunk;
+				});
+				res.on("end", function () {
+					content = content.split("<em");
+					if (content[1]) {
+						content = content[1].split("</p>");
+						if (content[0]) {
+							content = content[0].split("</em>");
+							if (content[1]) {
+								regdate = content[1].trim();
+								showProfile();
+							}
+						}
+					} else {
+						regdate = '(Unregistered)';
+						showProfile();
+					}
+				});
+			});
+			req.end();
+
+			function showProfile() {
+				//if (!lastOnline) lastOnline = "Never";
+				var profile = '';
+				profile += '<img src="' + avatar + '" height=80 width=80 align=left>';
+				profile += '&nbsp;<font color=#24678d><b>Name: </font><b><font color="' + hashColor(toId(username)) + '">' + Tools.escapeHTML(username) + '</font></b><br />';
+				profile += '&nbsp;<font color=#24678d><b>Registered: </font></b>' + regdate + '<br />';
+				//if (!Users.vips[userid]) profile += '&nbsp;<font color=#24678d><b>Rank: </font></b>' + userGroup + '<br />';
+				//if (Users.vips[userid]) profile += '&nbsp;<font color=#24568d><b>Rank: </font></b>' + userGroup + ' (<font color=#6390F0><b>VIP User</b></font>)<br />';
+				if (bucks) profile += '&nbsp;<font color=#24678d><b>Bucks: </font></b>' + bucks + '<br />';
+				//if (online) profile += '&nbsp;<font color=#24678d><b>Last Online: </font></b><font color=green>Currently Online</font><br />';
+				//if (!online) profile += '&nbsp;<font color=#24678d><b>Last Online: </font></b>' + lastOnline + '<br />';
+				profile += '<br clear="all">';
+				self.sendReplyBox(profile);
+				room.update();
+			}
+		});
 	},
 
 	economycode: function (target, room, user) {
