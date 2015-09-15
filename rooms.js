@@ -88,12 +88,12 @@ var Room = (function () {
 		message = CommandParser.parse(message, this, user, connection);
 
 		if (message && message !== true) {
-			var emoticons = parseEmoticons(user.getIdentity(this.roomid), message);
+			//var emoticons = parseEmoticons(user.getIdentity(this.roomid), message);
 			if (Users.ShadowBan.checkBanned(user)) {
 				Users.ShadowBan.addMessage(user, "To " + this.id, message);
 				connection.sendTo(this, '|c|' + user.getIdentity(this.id) + '|' + message);
-			} else if (emoticons && this.emoteStatus) {
-			    this.addRaw(emoticons);
+			//} else if (emoticons && this.emoteStatus) {
+			   // this.addRaw(emoticons);
 			} else {
 			    this.add('|c|' + user.getIdentity(this.id) + '|' + message);
 			}
