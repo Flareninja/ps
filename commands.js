@@ -16,6 +16,7 @@
 var crypto = require('crypto');
 var fs = require('fs');
 var ipbans = fs.createWriteStream('config/ipbans.txt', {'flags': 'a'});
+var parseEmoticons = require('./chat-plugins/emoticons').parseEmoticons;
 
 const MAX_REASON_LENGTH = 300;
 const MUTE_LENGTH = 7 * 60 * 1000;
@@ -256,7 +257,7 @@ var commands = exports.commands = {
 			}
 		}
 
-	var emoteMsg = parseEmoticons(target, room, user, true);
+		var emoteMsg = parseEmoticons(target, room, user, true);
 		if ((!user.blockEmoticons && !targetUser.blockEmoticons) && emoteMsg) target = '/html ' + emoteMsg;
 
 		var message = '|pm|' + user.getIdentity() + '|' + targetUser.getIdentity() + '|' + target;
@@ -264,6 +265,7 @@ var commands = exports.commands = {
 		if (targetUser !== user) targetUser.send(message);
 		targetUser.lastPM = user.userid;
 		user.lastPM = targetUser.userid;
+
 	},
 	msghelp: ["/msg OR /whisper OR /w [username], [message] - Send a private message."],
 
@@ -1467,6 +1469,89 @@ var commands = exports.commands = {
 		this.add('|raw|' + target);
 		this.logModCommand(user.name + " plain declared " + target);
 	},
+ccdeclare: 'customcolordeclare',
+ccd: 'customcolordeclare',
+customcolordeclare: function (target, room, user) {
+		if (target.includes(',')) {
+		var targets = target.split(',');
+					targets[0] = targets[0].toLowerCase();
+		if (!target) return this.parse('/help customcolordeclare');
+		if (!this.can('declare', null, room)) return false;
+
+		if (!this.canTalk()) return;
+
+		this.add('|raw|<div style="border-style: ridge; border-color: #000000; border-width: 2px; padding: 5px 5px; background-color:'+ targets[0] +';"><b>' + targets[1] + '</b></div>');
+		this.logModCommand(user.name + " declared " + target);
+	}
+	},
+	advertise: function (target, room, user) {
+	    if (target.includes(',')) {
+		var targets = target.split(',');
+					targets[1] = targets[1].toLowerCase();
+     targets[1] = targets[1].replace(/\s+/g, '');
+		if (!target) return this.parse('/help advertise');
+		if (!this.can('potd', null, room)) return false;
+
+		if (!this.canTalk()) return;
+
+		this.add('|raw|<div style="border-style: ridge; border-width: 5px; border-color:#FFCC00; background-image: url(&quot;http://s4.postimg.org/bcuxqym4d/Pokemon_Charizard_Cartoon_Wallpaper.jpg&quot;) ; background-size: cover ; cursor: url(&quot;http://www.rw-designer.com/cursor-view/7788.gif&quot;) , auto">&nbsp;Advertisement:~<b><center><u><h2><a style="font-family:Papyrus; color:white;" href="/' + targets[1] + '">' + targets[2] + '</a></h2></u></center></b><center><font style="font-family:Verdana; font-size:13px;" color="#FFFFCC"><b>' + targets[3] + '</b></font></center><center><font style="font-family:Comic Sans MS;" color="white"><h3>By: ' + targets[0] + '</font></h3></center></div>');
+		this.logModCommand(user.name + " advertised " + target);
+	}
+	},
+	advertisehelp: ["/advertise [By],[Room Name],[Heading],[message] - Anonymously announces an advertisement. Requires: & ~"],
+
+	advertisevenusaur: function (target, room, user) {
+	    if (target.includes(',')) {
+		var targets = target.split(',');
+					targets[1] = targets[1].toLowerCase();
+     targets[1] = targets[1].replace(/\s+/g, '');
+		if (!target) return this.parse('/help advertisevenusaur');
+		if (!this.can('potd', null, room)) return false;
+
+		if (!this.canTalk()) return;
+
+		this.add('|raw|<div style="border-style: ridge; border-width: 5px; border-color:#FFCC00; background-image: url(&quot;https://pokewalls.files.wordpress.com/2013/09/megavenusaur1920x1200.jpg?w=400&quot;) ; background-size: cover ; cursor: url(&quot;http://www.rw-designer.com/cursor-view/7788.gif&quot;) , auto">&nbsp;Advertisement:~<b><center><u><h2><a style="font-family:Papyrus; color:black;" href="/' + targets[1] + '">' + targets[2] + '</a></h2></u></center></b><center><font style="font-family:Verdana; font-size:13px;" color="#FFFFCC"><b>' + targets[3] + '</b></font></center><center><font style="font-family:Comic Sans MS;" color="white"><h3>By: ' + targets[0] + '</font></h3></center></div>');
+		this.logModCommand(user.name + " advertised " + target);
+	}
+	},
+	advertisevenusaurhelp: ["/advertisevenusaur [By],[Room Name],[Heading],[message] - Anonymously announces an advertisement. Requires: & ~"],
+
+	advertiseblastoise: function (target, room, user) {
+	    if (target.includes(',')) {
+		var targets = target.split(',');
+					targets[1] = targets[1].toLowerCase();
+     targets[1] = targets[1].replace(/\s+/g, '');
+		if (!target) return this.parse('/help advertiseblastoise');
+		if (!this.can('potd', null, room)) return false;
+
+		if (!this.canTalk()) return;
+
+		this.add('|raw|<div style="border-style: ridge; border-width: 5px; border-color:#FFCC00; background-image: url(&quot;https://pokewalls.files.wordpress.com/2011/06/9blastoise1920x1200.jpg&quot;) ; background-size: cover ; cursor: url(&quot;http://www.rw-designer.com/cursor-view/7788.gif&quot;) , auto">&nbsp;Advertisement:~<b><center><u><h2><a style="font-family:Papyrus; color:red;" href="/' + targets[1] + '">' + targets[2] + '</a></h2></u></center></b><center><font style="font-family:Verdana; font-size:13px;" color="#FFFFCC"><b>' + targets[3] + '</b></font></center><center><font style="font-family:Comic Sans MS;" color="white"><h3>By: ' + targets[0] + '</font></h3></center></div>');
+		this.logModCommand(user.name + " advertised " + target);
+	}
+	},
+	advertiseblastoisehelp: ["/advertiseblastoise [By],[Room Name],[Heading],[message] - Anonymously announces an advertisement. Requires: & ~"],
+
+	declarered: function (target, room, user) {
+		if (!target) return this.parse('/help declare');
+		if (!this.can('declare', null, room)) return false;
+
+		if (!this.canTalk()) return;
+
+		this.add('|raw|<div class="broadcast-red"><b>' + target + '</b></div>');
+		this.logModCommand(user.name + " declared " + target);
+	},
+	declareredhelp: ["/declarered [message] - Anonymously announces a message. Requires: # & ~"],
+declaregreen: function (target, room, user) {
+		if (!target) return this.parse('/help declare');
+		if (!this.can('declare', null, room)) return false;
+
+		if (!this.canTalk()) return;
+
+		this.add('|raw|<div class="broadcast-green"><b>' + target + '</b></div>');
+		this.logModCommand(user.name + " declared " + target);
+	},
+	declareredhelp: ["/declarered [message] - Anonymously announces a message. Requires: # & ~"],
 
 	gdeclare: 'globaldeclare',
 	globaldeclare: function (target, room, user) {
