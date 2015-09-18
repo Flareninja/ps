@@ -13,6 +13,9 @@
 const RESULTS_MAX_LENGTH = 10;
 var http = require('http');
 var fs = require('fs');
+var badges = fs.createWriteStream('leaguebadges.txt', { 
+  'flags': 'a' 
+ }); 
 var geoip = require('geoip-lite');
 geoip.startWatchingDataUpdate();
 var urbanCache = {};
@@ -219,6 +222,170 @@ var commands = exports.commands = {
 	/*********************************************************
 	 * Shortcuts
 	 *********************************************************/
+
+removelb:'removeleaguebadge',
+removeleaguebadge: function(target, room, user) {
+        if (!this.can('hotpatch')) return false;
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        if (!target) return this.sendReply('/removelb [user], [badge] - Removes a Leaguebadge from a user.');
+        if (!targetUser) return this.sendReply('There is no user named ' + this.targetUsername + '.');
+        var self = this;
+        var type_of_badges = ['cascadebadge', 'bot', 'thunderbadge', 'vip', 'artist', 'mod', 'leader', 'champ', 'rainbowbadge', 'comcun', 'twinner', 'goodra', 'league', 'boulderbadge'];
+        if (type_of_badges.indexOf(target) > -1 == false) return this.sendReply('The badge ' + target + ' is not a valid badge.');
+        fs.readFile('leaguebadges.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            var match = false;
+            var currentbadges = '';
+            var row = ('' + data).split('\n');
+            var line = '';
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var split = row[i].split(':');
+                if (split[0] == targetUser.userid) {
+                    match = true;
+                    currentbadges = split[1];
+                    line = row[i];
+                }
+            }
+            if (match == true) {
+                if (currentbadges.indexOf(target) > -1 == false) return self.sendReply(currentbadges); //'The user '+targetUser+' does not have the badge.');
+                var re = new RegExp(line, 'g');
+                currentbadges = currentbadges.replace(target, '');
+                var newdata = data.replace(re, targetUser.userid + ':' + currentbadges);
+                fs.writeFile('leaguebadges.txt', newdata, 'utf8', function(err, data) {
+                    if (err) console.log(err);
+                    return self.sendReply('You have removed the badge ' + target + ' from the user ' + targetUser + '.');
+                });
+            } else {
+                return self.sendReply('There is no match for the user ' + targetUser + '.');
+            }
+        });
+    },
+       
+           givelb:'giveleaguebadge',
+    giveleaguebadge: function(target, room, user) {
+        if (!this.can('declare', null, room)) return this.sendReply('You dont have access to this command.');
+       
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        if (!targetUser) return this.sendReply('There is no user named ' + this.targetUsername + '.');
+        if (!target) return this.sendReply('/givelb [user], [badge] - Gives a Leaguebadge to a user. Requires: &~');
+        var self = this;
+        var type_of_badges = ['cascadebadge', 'stormbadge', 'thunderbadge', 'fogbadge', 'volcanobadge', 'hivebadge', 'marshbadge', 'zephyrbadge', 'rainbowbadge', 'soulbadge', 'plainbadge ', 'earthbadge', 'boulderbadge'];
+        if (type_of_badges.indexOf(target) > -1 == false) return this.sendReply('Ther is no badge named ' + target + '.');
+        fs.readFile('leaguebadges.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            var currentbadges = '';
+            var line = '';
+            var row = ('' + data).split('\n');
+            var match = false;
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var split = row[i].split(':');
+                if (split[0] == targetUser.userid) {
+                    match = true;
+                    currentbadges = split[1];
+                    line = row[i];
+                }
+            }
+            if (match == true) {
+                if (currentbadges.indexOf(target) > -1) return self.sendReply('The user ' + targerUser + ' already has the badge ' + target + '.');
+                var re = new RegExp(line, 'g');
+                var newdata = data.replace(re, targetUser.userid + ':' + currentbadges + target);
+                fs.writeFile('leaguebadges.txt', newdata, function(err, data) {
+                    if (err) console.log(err);
+                    self.sendReply('You have given the badge ' + target + ' to the user ' + targetUser + '.');
+                    targetUser.send('You have recieved the badge ' + target + ' from the user ' + user.userid + '.');
+                    room.addRaw(targetUser + ' has recieved the ' + target + ' badge from ' + user.name);
+                });
+            } else {
+                fs.appendFile('leaguebadges.txt', '\n' + targetUser.userid + ':' + target, function(err) {
+                    if (err) console.log(err);
+                    self.sendReply('You have given the badge ' + target + ' to the user ' + targetUser + '.');
+                    targetUser.send('You have recieved the badge ' + target + ' from the user ' + user.userid + '.');
+                });
+            }
+        })
+    },
+         lblist:'leaguebadgelist',
+    leaguebadgelist: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+         var boulderbadge = '<img src= "http://vignette1.wikia.nocookie.net/pokemon/images/2/24/Boulderbadge.png/revision/latest?cb=20100418182312"height="15" width="15" title="Rock GymLeader 1G">';
+        var cascadebadge = '<img src= "http://vignette4.wikia.nocookie.net/pokemon/images/4/4d/Cascadebadge.png/revision/latest?cb=20140907085215"height="15" width="15" title="Water Badge 1G">';
+        var thunderbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/a/a8/Thunderbadge.png/revision/latest?cb=20100418182457" height="15" width="15" title="Thunder badge 1G">';
+        var rainbowbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b5/Rainbow_Badge.png/revision/latest?cb=20141009005938"height="15" width="15"  title="rainbow badge 1G">';
+        var soulbadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/6/64/Soulbadge.png/revision/latest?cb=20100418182548"height="15" width="15" title="Soul badge 1G">';
+        var marshbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/1/1c/Marshbadge.png/revision/latest?cb=20100418182532"height="15" width="15" title="Marsh Leader 1G">';
+        var volcanobadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/d/d9/Volcanobadge.png/revision/latest?cb=20081229171449"height="15" width="15" title="Volcano Badge 1G">';
+        var earthbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/c/cc/Earthbadge.png/revision/latest?cb=20101029071826"height="15" width="15" title="Earth badge 1G">';
+        var zephyrbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b6/Zephyrbadge.png/revision/latest?cb=20081229171509"height="15" width="15" title="Zephyr Badge 2G">';
+        var hivebadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/d/d0/Hivebadge.png/revision/latest?cb=20081229171030"height="15" width="15" title="Hive Badge 2G">';
+        var Plainbadge = '<img src="http://vignette4.wikia.nocookie.net/pokemon/images/4/42/Plainbadge.png/revision/latest?cb=20081229171221"height="15" width="15" title="Plane Badge 2G">';
+        var fogbadge = '<img src="http://vignette3.wikia.nocookie.net/pokemon/images/4/4f/Fogbadge.png/revision/latest?cb=20081229170948"height="15" width="15" title="Fog Badge 2G">';
+        var stormbadge = '<img src="http://vignette4.wikia.nocookie.net/pokemon/images/c/ca/Stormbadge.png/revision/latest?cb=20081229171417"height="15" width="15" title="Storm Badge 2G">';
+        return this.sendReplyBox('<b>List of Fireball League Badges</b>:<br>' + boulderbadge + '  ' + cascadebadge + '    ' + thunderbadge + '  ' + rainbowbadge + '   ' + comcun + '    ' + mod + '    ' + leader + '    ' + league + '    ' + champ + '    ' + artist + '    ' + twinner + '    ' + vip + '    ' + bot + ' <br>--Hover over them to see the meaning of each.<br>--Get a badge and get a FREE custom avatar!<br>--Click <a href="http://goldserver.weebly.com/badges.html">here</a> to find out more about how to get a badge.');
+    },
+    
+    lb: 'leaguebadge',
+    lbadges: 'leaguebadge',
+    leaguebadge: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        if (target == '') target = user.userid;
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        var matched = false;
+        if (!targetUser) return false;
+         var boulderbadge = 'http://vignette1.wikia.nocookie.net/pokemon/images/2/24/Boulderbadge.png/revision/latest?cb=20100418182312"height="15" width="15" title="Rock GymLeader 1g">';
+        var cascadebadge = '<img src= "http://vignette4.wikia.nocookie.net/pokemon/images/4/4d/Cascadebadge.png/revision/latest?cb=20140907085215"height="15" width="15" title="Water Badge">';
+        var thunderbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/a/a8/Thunderbadge.png/revision/latest?cb=20100418182457" height="15" width="15" title="Thunder badge">';
+            var rainbowbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b5/Rainbow_Badge.png/revision/latest?cb=20141009005938" height="15" width="15" title="rainbow badge">';
+        var comcun = '<img src="http://www.smogon.com/media/forums/images/badges/cc.png" title="Community Contributor">';
+        var leader = '<img src="http://www.smogon.com/media/forums/images/badges/aop.png" title="Server Leader">';
+        var mod = '<img src="http://www.smogon.com/media/forums/images/badges/pyramid_king.png" title="Exceptional Staff Member">';
+        var league = '<img src="http://www.smogon.com/media/forums/images/badges/forumsmod.png" title="Successful League Owner">';
+        var srf = '<img src="http://www.smogon.com/media/forums/images/badges/forumadmin_alum.png" title="Goodra League Champion">';
+        var artist = '<img src="http://www.smogon.com/media/forums/images/badges/ladybug.png" title="Artist">';
+        var twinner = '<img src="http://www.smogon.com/media/forums/images/badges/spl.png" title="Badge Tournament Winner">';
+        var vip = '<img src="http://www.smogon.com/media/forums/images/badges/zeph.png" title="VIP">';
+        var bot = '<img src="http://www.smogon.com/media/forums/images/badges/mind.png" title="Gold Bot Hoster">';
+        var self = this;
+        fs.readFile('leaguebadges.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            var row = ('' + data).split('\n');
+            var match = false;
+            var badges;
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var split = row[i].split(':');
+                if (split[0] == targetUser.userid) {
+                    match = true;
+                    currentbadges = split[1];
+                }
+            }
+            if (match == true) {
+                var leaguebadgelist = '';
+                if (currentbadges.indexOf('boulderbadge') > -1) leaguebadgelist += ' ' + boulderbadge;
+                if (currentbadges.indexOf('cascadebadge') > -1) leaguebadgelist += ' ' + cascadebadge;
+                if (currentbadges.indexOf('thunderbadge') > -1) leaguebadgelist += ' ' + thunderbadge;
+                if (currentbadges.indexOf('rainbowbadge') > -1) leaguebadgelist += ' ' + rainbowbadge;
+                if (currentbadges.indexOf('comcun') > -1) leaguebadgelist += ' ' + comcun;
+                if (currentbadges.indexOf('leader') > -1) leaguebadgelist += ' ' + leader;
+                if (currentbadges.indexOf('mod') > -1) leaguebadgelist += ' ' + mod;
+                if (currentbadges.indexOf('league') > -1) leaguebadgelist += ' ' + league;
+                if (currentbadges.indexOf('champ') > -1) leaguebadgelist += ' ' + champ;
+                if (currentbadges.indexOf('artist') > -1) leaguebadgelist += ' ' + artist;
+                if (currentbadges.indexOf('twinner') > -1) leaguebadgelist += ' ' + twinner;
+                if (currentbadges.indexOf('vip') > -1) leaguebadgelist += ' ' + vip;
+                if (currentbadges.indexOf('bot') > -1) leaguebadgelist += ' ' + bot;
+                self.sendReplyBox(targetUser.userid + "'s badges: " + leaguebadgelist);
+                room.update();
+            } else {
+                self.sendReplyBox('User ' + targetUser.userid + ' has no League badges.');
+                room.update();
+            }
+        });
+    },
 
 	inv: 'invite',
 	invite: function (target, room, user) {
