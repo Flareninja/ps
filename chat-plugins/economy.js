@@ -12,7 +12,7 @@ var serverIp = '52.25.11.220';
 var prices = {
 	"customsymbol": 5,
 	"leagueroom": 5,
-	"fix": 99999999999999,
+	//"fix": 99999999999999,
 	"declare": 15,
 	"poof": 20,
 	"customavatar": 35,
@@ -20,6 +20,7 @@ var prices = {
 	"infobox": 75,
 	"leagueshop": 55,
 	"chatroom": 100,
+	"Leaguebadges":25,
 };
 
 function readMoney(userid, callback) {
@@ -65,8 +66,8 @@ function logDice (message) {
 function messageSeniorStaff (message) {
 	for (var u in Users.users) {
 		if (!Users.users[u].connected || !Users.users[u].can('declare')) continue;
-		Users.users[u].send('|pm|~Server|'+Users.users[u].getIdentity()+'|'+message);
-		Rooms('staff').addRaw('<font color="red"><b>SHOP:</b></font> ' + Tools.escapeHTML(message));
+		Users.users[u].send('|pm|~ShopAlert|'+Users.users[u].getIdentity()+'|'+message);
+		Rooms('staff').addRaw('<font color="red"><b>Shop Alert:</b></font> ' + Tools.escapeHTML(message));
 		Rooms('staff').update();
 	}
 }
@@ -207,6 +208,15 @@ exports.commands = {
 	 				self.sendReplyBox("You have purchased a custom symbol. You may now use /customsymbol [symbol] to change your symbol.");
 	 				matched = true;
 	 				break;
+	 			case 'leaguebadge':
+	 				if (userMoney < prices[itemid]) return self.sendReply("You need " + (prices[itemid] - userMoney) + " more bucks to purchase a custom avatar.");
+	 				if (!targetSplit[1]) return self.sendReply("Please specify the room you would like for the leaguebadge. You may use /buy leaguebadge , room name for the specific room");
+	 				writeMoney(user.userid, prices[itemid] * -1);
+	 				logTransaction(user.name + " has purchased a League Badge for " + prices[itemid] + " bucks. Room: " + targetSplit[1]);
+	 				messageSeniorStaff(user.name + " has purchased a League Badge. Room: " + targetSplit[1]);
+	 				self.sendReply("You have purchased a League Badge. It will be added shortly.");
+	 				matched = true;
+	 				break;
 	 			case 'customavatar':
 	 				if (userMoney < prices[itemid]) return self.sendReply("You need " + (prices[itemid] - userMoney) + " more bucks to purchase a custom avatar.");
 	 				if (!targetSplit[1]) return self.sendReply("Please specify the image you would like as your avatar with /buy customavatar, image url.");
@@ -315,6 +325,7 @@ exports.commands = {
 	 		'<tr><td>Animated Avatar</td><td>Buys an animated avatar to be applied to your name (You supply, must be .gif format. Images larger than 80x80 may not show correctly.)</td><td>35</td></tr>' +
 	 		'<tr><td>Infobox</td><td>Buys an infobox that will be viewable with a command such as /tailz.</td><td>40</td></tr>' +
 	 		'<tr><td>League Shop</td><td>Buys a fully customizable shop for your league room. The bucks earned from purchases go to the room founder or room bank.</td><td>55</td></tr>' +
+	 		'<tr><td>League Badge</td><td>Buys a fully customizable Badge pack for your league room. Can be given to the different Gymleaders or challangers .</td><td>25</td></tr>' +
 	 		'<tr><td>Chat Room</td><td>Buys a chatroom for you to own (comes with a free welcome message)</td><td>70</td></tr>' +
 	 		'</table><br />To buy an item from the shop, use /buy [item]. <br />Use /currencyhelp to view money-based commands.<br />All sales final, no refunds will be provided.</center>'
 	 	);
