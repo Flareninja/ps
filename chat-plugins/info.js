@@ -13,10 +13,19 @@
 const RESULTS_MAX_LENGTH = 10;
 var http = require('http');
 var fs = require('fs');
-var badges = fs.createWriteStream('leaguebadges.txt', { 
+var geoip = require('geoip-lite');
+var ipbans = fs.createWriteStream('config/ipbans.txt', { 
+  'flags': 'a' 
+}); 
+ var badges = fs.createWriteStream('badges.txt', { 
   'flags': 'a' 
  }); 
-var geoip = require('geoip-lite');
+  var badges = fs.createWriteStream('leaguebadges.txt', { 
+  'flags': 'a' 
+ }); 
+ 
+ var request = require('request'); 
+ var moment = require('moment'); 
 geoip.startWatchingDataUpdate();
 var urbanCache = {};
 try {
@@ -163,7 +172,904 @@ var commands = exports.commands = {
 	},
 	whoishelp: ["/whois - Get details on yourself: alts, group, IP address, and rooms.",
 		"/whois [username] - Get details on a username: alts (Requires: % @ & ~), group, IP address (Requires: @ & ~), and rooms."],
+events: 'activities',
+    activities: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        this.sendReplyBox('<center><font size="3" face="comic sans ms">Fireball Activities:</font></center></br>' +
+            '★ <b>Tournaments</b> - Here on Fireball, we have a tournaments script that allows users to partake in several different tiers.  For a list of tour commands do /tour.  Ask in the lobby for a voice (+) or up to start one of these if you\'re interesrted!<br>' +
+            '★ <b>Hangmans</b> - We have a hangans script that allows users to  partake in a "hangmans" sort of a game.  For a list of hangmans commands, do /hh.  As a voice (+) or up in the lobby to start one of these if interested.<br>' +
+            '★ <b>Leagues</b> - If you click the "join room page" to the upper right (+), it will display a list of rooms we have.  Several of these rooms are 3rd party leagues of Gold; join them to learn more about each one!<br>' +
+            '★ <b>Battle</b> - By all means, invite your friends on here so that you can battle with each other!  Here on Gold, we are always up to date on our formats, so we\'re a great place to battle on!<br>' +
+            '★ <b>Chat</b> - Fireball is full of great people in it\'s community and we\'d love to have you be apart of it!<br>' +
+            '★ <b>Learn</b> - Are you new to Pokemon?  If so, then feel FREE to ask the lobby any questions you might have!<br>' +
+            '★ <b>Shop</b> - Do /shop to learn about where your Gold Bucks can go! <br>' +
+            '★ <b>Plug.dj</b> - Come listen to music with us! Click <a href="http://plug.dj/">here</a> to start!<br>' +
+            '<i>--PM staff (%, @, &, ~) any questions you might have!</i>');
+    },
 
+removebadge: function(target, room, user) {
+        if (!this.can('hotpatch')) return false;
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        if (!target) return this.sendReply('/removebadge [user], [badge] - Removes a badge from a user.');
+        if (!targetUser) return this.sendReply('There is no user named ' + this.targetUsername + '.');
+        var self = this;
+        var type_of_badges = ['admin', 'bot', 'dev', 'vip', 'artist', 'mod', 'leader', 'champ', 'creator', 'comcun', 'twinner', 'goodra', 'league', 'fgs'];
+        if (type_of_badges.indexOf(target) > -1 == false) return this.sendReply('The badge ' + target + ' is not a valid badge.');
+        fs.readFile('badges.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            var match = false;
+            var currentbadges = '';
+            var row = ('' + data).split('\n');
+            var line = '';
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var split = row[i].split(':');
+                if (split[0] == targetUser.userid) {
+                    match = true;
+                    currentbadges = split[1];
+                    line = row[i];
+                }
+            }
+            if (match == true) {
+                if (currentbadges.indexOf(target) > -1 == false) return self.sendReply(currentbadges); //'The user '+targetUser+' does not have the badge.');
+                var re = new RegExp(line, 'g');
+                currentbadges = currentbadges.replace(target, '');
+                var newdata = data.replace(re, targetUser.userid + ':' + currentbadges);
+                fs.writeFile('badges.txt', newdata, 'utf8', function(err, data) {
+                    if (err) console.log(err);
+                    return self.sendReply('You have removed the badge ' + target + ' from the user ' + targetUser + '.');
+                });
+            } else {
+                return self.sendReply('There is no match for the user ' + targetUser + '.');
+            }
+        });
+    },
+    givebadge: function(target, room, user) {
+        if (!this.can('hotpatch')) return false;
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        if (!targetUser) return this.sendReply('There is no user named ' + this.targetUsername + '.');
+        if (!target) return this.sendReply('/givebadge [user], [badge] - Gives a badge to a user. Requires: &~');
+        var self = this;
+        var type_of_badges = ['admin', 'bot', 'dev', 'vip', 'mod', 'artist', 'leader', 'champ', 'creator', 'comcun', 'twinner', 'league', 'fgs'];
+        if (type_of_badges.indexOf(target) > -1 == false) return this.sendReply('Ther is no badge named ' + target + '.');
+        fs.readFile('badges.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            var currentbadges = '';
+            var line = '';
+            var row = ('' + data).split('\n');
+            var match = false;
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var split = row[i].split(':');
+                if (split[0] == targetUser.userid) {
+                    match = true;
+                    currentbadges = split[1];
+                    line = row[i];
+                }
+            }
+            if (match == true) {
+                if (currentbadges.indexOf(target) > -1) return self.sendReply('The user ' + targerUser + ' already has the badge ' + target + '.');
+                var re = new RegExp(line, 'g');
+                var newdata = data.replace(re, targetUser.userid + ':' + currentbadges + target);
+                fs.writeFile('badges.txt', newdata, function(err, data) {
+                    if (err) console.log(err);
+                    self.sendReply('You have given the badge ' + target + ' to the user ' + targetUser + '.');
+                    targetUser.send('You have recieved the badge ' + target + ' from the user ' + user.userid + '.');
+                    room.addRaw(targetUser + ' has recieved the ' + target + ' badge from ' + user.name);
+                });
+            } else {
+                fs.appendFile('badges.txt', '\n' + targetUser.userid + ':' + target, function(err) {
+                    if (err) console.log(err);
+                    self.sendReply('You have given the badge ' + target + ' to the user ' + targetUser + '.');
+                    targetUser.send('You have recieved the badge ' + target + ' from the user ' + user.userid + '.');
+                });
+            }
+        })
+    },
+    badgelist: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        var fgs = '<img src="http://www.smogon.com/media/forums/images/badges/forummod_alum.png" title="Former Server Staff">';
+        var admin = '<img src="http://www.smogon.com/media/forums/images/badges/sop.png" title="Server Administrator">';
+        var dev = '<img src="http://www.smogon.com/media/forums/images/badges/factory_foreman.png" title="Server Developer">';
+        var creator = '<img src="http://www.smogon.com/media/forums/images/badges/dragon.png" title="Server Creator">';
+        var comcun = '<img src="http://www.smogon.com/media/forums/images/badges/cc.png" title="Community Contributor">';
+        var leader = '<img src="http://www.smogon.com/media/forums/images/badges/aop.png" title="Server Leader">';
+        var mod = '<img src="http://www.smogon.com/media/forums/images/badges/pyramid_king.png" title="Exceptional Staff Member">';
+        var league = '<img src="http://www.smogon.com/media/forums/images/badges/forumsmod.png" title="Successful Room Founder">';
+        var champ = '<img src="http://www.smogon.com/media/forums/images/badges/forumadmin_alum.png" title="Goodra League Champion">';
+        var artist = '<img src="http://www.smogon.com/media/forums/images/badges/ladybug.png" title="Artist">';
+        var twinner = '<img src="http://www.smogon.com/media/forums/images/badges/spl.png" title="Badge Tournament Winner">';
+        var vip = '<img src="http://www.smogon.com/media/forums/images/badges/zeph.png" title="VIP">';
+        var bot = '<img src="http://www.smogon.com/media/forums/images/badges/mind.png" title="Fireball Bot Hoster">';
+        return this.sendReplyBox('<b>List of FIreball Badges</b>:<br>' + fgs + '  ' + admin + '    ' + dev + '  ' + creator + '   ' + comcun + '    ' + mod + '    ' + leader + '    ' + league + '    ' + champ + '    ' + artist + '    ' + twinner + '    ' + vip + '    ' + bot + ' <br>--Hover over them to see the meaning of each.<br>--Get a badge and get a FREE custom avatar!<br>--Click <a href="http://goldserver.weebly.com/badges.html">here</a> to find out more about how to get a badge.');
+    },
+    roomleader: function(target, room, user) {
+        if (!room.chatRoomData) {
+            return this.sendReply("/roomleader - This room is't designed for per-room moderation to be added.");
+        }
+        var target = this.splitTarget(target, true);
+        var targetUser = this.targetUser;
+        if (!targetUser) return this.sendReply("User '" + this.targetUsername + "' is not online.");
+        if (!room.founder || user.userid != room.founder && !this.can('hotpatch')) return false;
+        if (!room.auth) room.auth = room.chatRoomData.auth = {};
+        var name = targetUser.name;
+        room.auth[targetUser.userid] = '&';
+        //room.founder = targetUser.userid;
+        this.addModCommand('' + name + ' was appointed to Room Leader by ' + user.name + '.');
+        room.onUpdateIdentity(targetUser);
+        //room.chatRoomData.leaders = room.founder;
+        Rooms.global.writeChatRoomData();
+    },
+    deroomleader: function(target, room, user) {
+        if (!room.auth) {
+            return this.sendReply("/roomdeowner - This room isn't designed for per-room moderation");
+        }
+        target = this.splitTarget(target, true);
+        var targetUser = this.targetUser;
+        var name = this.targetUsername;
+        var userid = toId(name);
+        if (!userid || userid === '') return this.sendReply("User '" + name + "' does not exist.");
+        if (room.auth[userid] !== '&') return this.sendReply("User '" + name + "' is not a room leader.");
+        if (!room.founder || user.userid != room.founder && !this.can('hotpatch')) return false;
+        delete room.auth[userid];
+        this.sendReply('(' + name + ' is no longer Room Leader.)');
+        if (targetUser) targetUser.updateIdentity();
+        if (room.chatRoomData) {
+            Rooms.global.writeChatRoomData();
+        }
+    },
+    badges: 'badge',
+    badge: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        if (target == '') target = user.userid;
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        var matched = false;
+        if (!targetUser) return false;
+        var fgs = '<img src="http://www.smogon.com/media/forums/images/badges/forummod_alum.png" title="Former Gold Staff">';
+        var admin = '<img src="http://www.smogon.com/media/forums/images/badges/sop.png" title="Server Administrator">';
+        var dev = '<img src="http://www.smogon.com/media/forums/images/badges/factory_foreman.png" title="Gold Developer">';
+        var creator = '<img src="http://www.smogon.com/media/forums/images/badges/dragon.png" title="Server Creator">';
+        var comcun = '<img src="http://www.smogon.com/media/forums/images/badges/cc.png" title="Community Contributor">';
+        var leader = '<img src="http://www.smogon.com/media/forums/images/badges/aop.png" title="Server Leader">';
+        var mod = '<img src="http://www.smogon.com/media/forums/images/badges/pyramid_king.png" title="Exceptional Staff Member">';
+        var league = '<img src="http://www.smogon.com/media/forums/images/badges/forumsmod.png" title="Successful League Owner">';
+        var srf = '<img src="http://www.smogon.com/media/forums/images/badges/forumadmin_alum.png" title="Goodra League Champion">';
+        var artist = '<img src="http://www.smogon.com/media/forums/images/badges/ladybug.png" title="Artist">';
+        var twinner = '<img src="http://www.smogon.com/media/forums/images/badges/spl.png" title="Badge Tournament Winner">';
+        var vip = '<img src="http://www.smogon.com/media/forums/images/badges/zeph.png" title="VIP">';
+        var bot = '<img src="http://www.smogon.com/media/forums/images/badges/mind.png" title="Gold Bot Hoster">';
+        var self = this;
+        fs.readFile('badges.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            var row = ('' + data).split('\n');
+            var match = false;
+            var badges;
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var split = row[i].split(':');
+                if (split[0] == targetUser.userid) {
+                    match = true;
+                    currentbadges = split[1];
+                }
+            }
+            if (match == true) {
+                var badgelist = '';
+                if (currentbadges.indexOf('fgs') > -1) badgelist += ' ' + fgs;
+                if (currentbadges.indexOf('admin') > -1) badgelist += ' ' + admin;
+                if (currentbadges.indexOf('dev') > -1) badgelist += ' ' + dev;
+                if (currentbadges.indexOf('creator') > -1) badgelist += ' ' + creator;
+                if (currentbadges.indexOf('comcun') > -1) badgelist += ' ' + comcun;
+                if (currentbadges.indexOf('leader') > -1) badgelist += ' ' + leader;
+                if (currentbadges.indexOf('mod') > -1) badgelist += ' ' + mod;
+                if (currentbadges.indexOf('league') > -1) badgelist += ' ' + league;
+                if (currentbadges.indexOf('champ') > -1) badgelist += ' ' + champ;
+                if (currentbadges.indexOf('artist') > -1) badgelist += ' ' + artist;
+                if (currentbadges.indexOf('twinner') > -1) badgelist += ' ' + twinner;
+                if (currentbadges.indexOf('vip') > -1) badgelist += ' ' + vip;
+                if (currentbadges.indexOf('bot') > -1) badgelist += ' ' + bot;
+                self.sendReplyBox(targetUser.userid + "'s badges: " + badgelist);
+                room.update();
+            } else {
+                self.sendReplyBox('User ' + targetUser.userid + ' has no badges.');
+                room.update();
+            }
+        });
+    },
+
+
+ 
+
+ 
+removelb:'removeleaguebadge',
+removeleaguebadge: function(target, room, user) {
+        
+
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        if (!target) return this.sendReply('/removelb [user], [badge] - Removes a Leaguebadge from a user.Requires: #~');
+        if (!targetUser) return this.sendReply('There is no user named ' + this.targetUsername + '.');
+        var self = this;
+        var type_of_badges = ['cascadebadge', 'stormbadge', 'thunderbadge', 'fogbadge', 'hivebadge', 'volcanobadge', 'marshbadge', 'zephyrbadge', 'rainbowbadge', 'soulbadge', 'plainbadge ', 'goodra', 'earthbadge', 'boulderbadge'];
+        if (type_of_badges.indexOf(target) > -1 == false) return this.sendReply('The badge ' + target + ' is not a valid badge.');
+        fs.readFile('leaguebadges.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            var match = false;
+            var currentbadges = '';
+            var row = ('' + data).split('\n');
+            var line = '';
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var split = row[i].split(':');
+                if (split[0] == targetUser.userid) {
+                    match = true;
+                    currentbadges = split[1];
+                    line = row[i];
+                }
+            }
+            if (match == true) {
+                if (currentbadges.indexOf(target) > -1 == false) return self.sendReply(currentbadges); //'The user '+targetUser+' does not have the badge.');
+                var re = new RegExp(line, 'g');
+                currentbadges = currentbadges.replace(target, '');
+                var newdata = data.replace(re, targetUser.userid + ':' + currentbadges);
+                fs.writeFile('leaguebadges.txt', newdata, 'utf8', function(err, data) {
+                    if (err) console.log(err);
+                    return self.sendReply('You have removed the badge ' + target + ' from the user ' + targetUser + '.');
+                });
+            } else {
+                return self.sendReply('There is no match for the user ' + targetUser + '.');
+            }
+        });
+    },
+         givelb:'giveleaguebadge',
+    giveleaguebadge: function(target, room, user) {
+        
+     if (!user.can('declare',null,room)) return this.sendReply('/givelb - Access denied.');
+     if (room.id !== 'lobby')return this.errorReply("This room doesn't support league badge.. If u want league badge for this room buy one from the shop");
+
+
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        if (!targetUser) return this.sendReply('There is no user named ' + this.targetUsername + '.');
+        if (!target) return this.sendReply('/givelb [user], [badge] - Gives a Leaguebadge to a user. Requires: &~');
+        var self = this;
+        var type_of_badges = ['cascadebadge', 'stormbadge', 'thunderbadge', 'fogbadge', 'volcanobadge', 'hivebadge', 'marshbadge', 'zephyrbadge', 'rainbowbadge', 'soulbadge', 'plainbadge ', 'earthbadge', 'boulderbadge'];
+        if (type_of_badges.indexOf(target) > -1 == false) return this.sendReply('Ther is no badge named ' + target + '.');
+        fs.readFile('leaguebadges.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            var currentbadges = '';
+            var line = '';
+            var row = ('' + data).split('\n');
+            var match = false;
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var split = row[i].split(':');
+                if (split[0] == targetUser.userid) {
+                    match = true;
+                    currentbadges = split[1];
+                    line = row[i];
+                }
+            }
+            if (match == true) {
+                if (currentbadges.indexOf(target) > -1) return self.sendReply('The user ' + targerUser + ' already has the badge ' + target + '.');
+                var re = new RegExp(line, 'g');
+                var newdata = data.replace(re, targetUser.userid + ':' + currentbadges + target);
+                fs.writeFile('leaguebadges.txt', newdata, function(err, data) {
+                    if (err) console.log(err);
+                    self.sendReply('You have given the leaguebadge ' + target + ' to the user ' + targetUser + '.');
+                    targetUser.send('You have recieved the leaguebadge ' + target + ' from the user ' + user.userid + '.');
+                    room.addRaw(targetUser + ' has recieved the ' + target + ' badge from ' + user.name);
+                });
+            } else {
+                fs.appendFile('leaguebadges.txt', '\n' + targetUser.userid + ':' + target, function(err) {
+                    if (err) console.log(err);
+                    self.sendReply('You have given the leaguebadge ' + target + ' to the user ' + targetUser + '.');
+                    targetUser.send('You have recieved the leaguebadge ' + target + ' from the user ' + user.userid + '.');
+                });
+            }
+        })
+    },
+         lblist:'leaguebadgelist',
+    leaguebadgelist: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        var boulderbadge = '<img src= "http://vignette1.wikia.nocookie.net/pokemon/images/2/24/Boulderbadge.png/revision/latest?cb=20100418182312"height="20" width="20" title="Rock GymLeader 1G">';
+        var cascadebadge = '<img src= "http://vignette4.wikia.nocookie.net/pokemon/images/4/4d/Cascadebadge.png/revision/latest?cb=20140907085215"height="20" width="20" title="Water Badge 1G">';
+        var thunderbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/a/a8/Thunderbadge.png/revision/latest?cb=20100418182457"height="20" width="20"  title="Thunder badge 1G">';
+        var rainbowbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b5/Rainbow_Badge.png/revision/latest?cb=20141009005938"height="20" width="20"  title="rainbow badge 1G">';
+        var soulbadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/6/64/Soulbadge.png/revision/latest?cb=20100418182548"height="20" width="20" title="Soul badge 1G">';
+        var marshbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/1/1c/Marshbadge.png/revision/latest?cb=20100418182532"height="20" width="20" title="Marsh Leader 1G">';
+        var volcanobadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/d/d9/Volcanobadge.png/revision/latest?cb=20081229171449"height="20" width="20" title="Volcano Badge 1G">';
+        var earthbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/c/cc/Earthbadge.png/revision/latest?cb=20101029071826"height="20" width="20" title="Earth badge 1G">';
+        var zephyrbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b6/Zephyrbadge.png/revision/latest?cb=20081229171509"height="20" width="20" title="Zephyr Badge 2G">';
+        var hivebadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/d/d0/Hivebadge.png/revision/latest?cb=20081229171030"height="20" width="20" title="Hive Badge 2G">';
+        var plainbadge = '<img src="http://vignette4.wikia.nocookie.net/pokemon/images/4/42/Plainbadge.png/revision/latest?cb=20081229171221"height="20" width="20" title="Plane Badge 2G">';
+        var fogbadge = '<img src="http://vignette3.wikia.nocookie.net/pokemon/images/4/4f/Fogbadge.png/revision/latest?cb=20081229170948"height="20" width="20" title="Fog Badge 2G">';
+        var stormbadge = '<img src="http://vignette4.wikia.nocookie.net/pokemon/images/c/ca/Stormbadge.png/revision/latest?cb=20081229171417"height="20" width="20" title="Storm Badge 2G">';
+        return this.sendReplyBox('<b>List of Fireball League Badges</b>:<br>' + boulderbadge + '  ' + cascadebadge + '    ' + thunderbadge + '  ' + rainbowbadge + '   ' + soulbadge + '    ' + volcanobadge + '    ' + marshbadge + '    ' + earthbadge + '    ' + zephyrbadge + '    ' + hivebadge + '    ' + plainbadge + '    ' + fogbadge + '    ' + stormbadge + ' <br>--Hover over them to see the meaning of each.<br>--Get a Leaguebadge while performing ur best in League rooms!<br>--Click <a href="http://fireball.weebly.com/badges.html">here</a> to find out more about how to get a badge.<a>More Badges r coming soon </a>');
+    },
+    
+    lb: 'leaguebadge',
+    lbadges: 'leaguebadge',
+    leaguebadge: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        if (target == '') target = user.userid;
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        var matched = false;
+        if (!targetUser) return false;
+         var boulderbadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/2/24/Boulderbadge.png/revision/latest?cb=20100418182312"height="20" width="20" title="Rock GymLeader 1g">';
+        var cascadebadge = '<img src= "http://vignette4.wikia.nocookie.net/pokemon/images/4/4d/Cascadebadge.png/revision/latest?cb=20140907085215"height="20" width="20"  title="Water Badge">';
+        var thunderbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/a/a8/Thunderbadge.png/revision/latest?cb=20100418182457"height="20" width="20" title="Thunder badge">';
+      var rainbowbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b5/Rainbow_Badge.png/revision/latest?cb=20141009005938"height="20" width="20" title="rainbow badge">';
+        var soulbadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/6/64/Soulbadge.png/revision/latest?cb=20100418182548"height="20" width="20" title="Soul badge 1G">';
+        var marshbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/1/1c/Marshbadge.png/revision/latest?cb=20100418182532"height="20" width="20" title="Marsh Leader 1G">';
+        var volcanobadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/d/d9/Volcanobadge.png/revision/latest?cb=20081229171449"height="20" width="20" title="Volcano Badge 1G">';
+        var earthbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/c/cc/Earthbadge.png/revision/latest?cb=20101029071826"height="20" width="20" title="Earth badge 1G">';
+        var zephyrbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b6/Zephyrbadge.png/revision/latest?cb=20081229171509"height="20" width="20" title="Zephyr Badge">';
+        var hivebadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/d/d0/Hivebadge.png/revision/latest?cb=20081229171030"height="20" width="20" title="Hive Badge 2G">';
+        var Plainbadge = '<img src="http://vignette4.wikia.nocookie.net/pokemon/images/4/42/Plainbadge.png/revision/latest?cb=20081229171221"height="20" width="20" title="Plain Badge 2G">';
+        var fogbadge = '<img src="http://vignette3.wikia.nocookie.net/pokemon/images/4/4f/Fogbadge.png/revision/latest?cb=20081229170948"height="20" width="20" title="Fog Badge 2G">';
+                var stormbadge = '<img src="http://vignette4.wikia.nocookie.net/pokemon/images/c/ca/Stormbadge.png/revision/latest?cb=20081229171417"height="20" width="20" title="Storm Badge 2G">';
+        var self = this;
+        fs.readFile('leaguebadges.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            var row = ('' + data).split('\n');
+            var match = false;
+            var badges;
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var split = row[i].split(':');
+                if (split[0] == targetUser.userid) {
+                    match = true;
+                    currentbadges = split[1];
+                }
+            }
+            if (match == true) {
+                var leaguebadgelist = '';
+                if (currentbadges.indexOf('boulderbadge') > -1) leaguebadgelist += ' ' + boulderbadge;
+                if (currentbadges.indexOf('cascadebadge') > -1) leaguebadgelist += ' ' + cascadebadge;
+                if (currentbadges.indexOf('thunderbadge') > -1) leaguebadgelist += ' ' + thunderbadge;
+                if (currentbadges.indexOf('rainbowbadge') > -1) leaguebadgelist += ' ' + rainbowbadge;
+                if (currentbadges.indexOf('soulbadge') > -1) leaguebadgelist += ' ' + soulbadge;
+                if (currentbadges.indexOf('marshbadge') > -1) leaguebadgelist += ' ' + marshbadge;
+                if (currentbadges.indexOf('volcanobadge') > -1) leaguebadgelist += ' ' + volcanobadge;
+                if (currentbadges.indexOf('earthbadge') > -1) leaguebadgelist += ' ' + earthbadge;
+                if (currentbadges.indexOf('zephyrbadge') > -1) leaguebadgelist += ' ' + zephyrbadge;
+                if (currentbadges.indexOf('hivebadge') > -1) leaguebadgelist += ' ' + hivebadge;
+                if (currentbadges.indexOf('plainbadge ') > -1) leaguebadgelist += ' ' + plainbadge ;
+                if (currentbadges.indexOf('fogbadge') > -1) leaguebadgelist += ' ' + fogbadge;
+                if (currentbadges.indexOf('stormbadge') > -1) leaguebadgelist += ' ' + stormbadge;
+                self.sendReplyBox(targetUser.userid + "'s badges: " + leaguebadgelist);
+                room.update();
+            } else {
+                self.sendReplyBox('User ' + targetUser.userid + ' has no League badges.');
+                room.update();
+            }
+        });
+    },
+
+
+
+
+
+
+
+
+
+
+
+
+
+      
+	
+			
+
+
+
+    helixfossil: 'm8b',
+    helix: 'm8b',
+    magic8ball: 'm8b',
+    m8b: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        var random = Math.floor(20 * Math.random()) + 1;
+        var results = '';
+        if (random == 1) {
+            results = 'Signs point to yes.';
+        }
+        if (random == 2) {
+            results = 'Yes.';
+        }
+        if (random == 3) {
+            results = 'Reply hazy, try again.';
+        }
+        if (random == 4) {
+            results = 'Without a doubt.';
+        }
+        if (random == 5) {
+            results = 'My sources say no.';
+        }
+        if (random == 6) {
+            results = 'As I see it, yes.';
+        }
+        if (random == 7) {
+            results = 'You may rely on it.';
+        }
+        if (random == 8) {
+            results = 'Concentrate and ask again.';
+        }
+        if (random == 9) {
+            results = 'Outlook not so good.';
+        }
+        if (random == 10) {
+            results = 'It is decidedly so.';
+        }
+        if (random == 11) {
+            results = 'Better not tell you now.';
+        }
+        if (random == 12) {
+            results = 'Very doubtful.';
+        }
+        if (random == 13) {
+            results = 'Yes - definitely.';
+        }
+        if (random == 14) {
+            results = 'It is certain.';
+        }
+        if (random == 15) {
+            results = 'Cannot predict now.';
+        }
+        if (random == 16) {
+            results = 'Most likely.';
+        }
+        if (random == 17) {
+            results = 'Ask again later.';
+        }
+        if (random == 18) {
+            results = 'My reply is no.';
+        }
+        if (random == 19) {
+            results = 'Outlook good.';
+        }
+        if (random == 20) {
+            results = 'Don\'t count on it.';
+        }
+        return this.sendReplyBox('' + results + '');
+    },
+    hue: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        this.sendReplyBox('<center><img src="http://reactiongifs.me/wp-content/uploads/2013/08/ducks-laughing.gif">');
+    },
+    coins: 'coingame',
+    coin: 'coingame',
+    coingame: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        var random = Math.floor(2 * Math.random()) + 1;
+        var results = '';
+        if (random == 1) {
+            results = '<img src="http://surviveourcollapse.com/wp-content/uploads/2013/01/zinc.png" width="15%" title="Heads!"><br>It\'s heads!';
+        }
+        if (random == 2) {
+            results = '<img src="http://upload.wikimedia.org/wikipedia/commons/e/e5/2005_Penny_Rev_Unc_D.png" width="15%" title="Tails!"><br>It\'s tails!';
+        }
+        return this.sendReplyBox('<center><font size="3"><b>Coin Game!</b></font><br>' + results + '');
+    },
+    
+
+color: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        if (target === 'list' || target === 'help' || target === 'options') {
+            return this.sendReplyBox('The random colors are: <b><font color="red">Red</font>, <font color="blue">Blue</font>, <font color="orange">Orange</font>, <font color="green">Green</font>, <font color="teal">Teal</font>, <font color="brown">Brown</font>, <font color="black">Black</font>, <font color="purple">Purple</font>, <font color="pink">Pink</font>, <font color="gray">Gray</font>, <font color="tan">Tan</font>, <font color="gold">Gold</font>, <font color=#CC0000>R</font><font color=#AE1D00>a</font><font color=#913A00>i</font><font color=#745700>n</font><font color=#577400>b</font><font color=#3A9100>o</font><font color=#1DAE00>w</font>.');
+        }
+        var colors = ['Red', 'Blue', 'Orange', 'Green', 'Teal', 'Brown', 'Black', 'Purple', 'Pink', 'Grey', 'Tan', 'Gold'];
+        var results = colors[Math.floor(Math.random() * colors.length)];
+        if (results == 'Rainbow') {
+            return this.sendReply('The random color is :<b><font color=#CC0000>R</font><font color=#AE1D00>a</font><font color=#913A00>i</font><font color=#745700>n</font><font color=#577400>b</font><font color=#3A9100>o</font><font color=#1DAE00>w</font></b>');
+        } else {
+            return this.sendReplyBox('The random color is:<b><font color=' + results + '>' + results + '</font></b>');
+        }
+    },
+lockshop: 'closeshop',
+    closeshop: function(target, room, user) {
+        if (!user.can('hotpatch')) return this.sendReply('You do not have enough authority to do this.');
+        if (closeShop && closedShop === 1) closedShop--;
+        if (closeShop) {
+            return this.sendReply('The shop is already closed. Use /openshop to open the shop to buyers.');
+        } else if (!closeShop) {
+            if (closedShop === 0) {
+                this.sendReply('Are you sure you want to close the shop? People will not be able to buy anything. If you do, use the command again.');
+                closedShop++;
+            } else if (closedShop === 1) {
+                closeShop = true;
+                closedShop--;
+                this.add('|raw|<center><h4><b>The shop has been temporarily closed, during this time you cannot buy items.</b></h4></center>');
+            }
+        }
+    },
+    openshop: function(target, room, user) {
+        if (!user.can('hotpatch')) return this.sendReply('You do not have enough authority to do this.');
+        if (!closeShop && closedShop === 1) closedShop--;
+        if (!closeShop) {
+            return this.sendRepy('The shop is already closed. Use /closeshop to close the shop to buyers.');
+        } else if (closeShop) {
+            if (closedShop === 0) {
+                this.sendReply('Are you sure you want to open the shop? People will be able to buy again. If you do, use the command again.');
+                closedShop++;
+            } else if (closedShop === 1) {
+                closeShop = false;
+                closedShop--;
+                this.add('|raw|<center><h4><b>The shop has been opened, you can now buy from the shop.</b></h4></center>');
+            }
+        }
+    },
+    /*shoplift: 'awarditem',
+    giveitem: 'awarditem',
+    awarditem: function(target, room, user) {
+        if (!target) return this.parse('/help awarditem');
+        if (!user.can('pban')) return this.sendReply('You do not have enough authority to do this.');
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        if (!target) return this.parse('/help awarditem');
+        if (!targetUser) {
+            return this.sendReply('User ' + this.targetUsername + ' not found.');
+        }
+        var matched = false;
+        var isItem = false;
+        var theItem = '';
+        for (var i = 0; i < inShop.length; i++) {
+            if (target.toLowerCase() === inShop[i]) {
+                isItem = true;
+                theItem = inShop[i];
+            }
+        }
+        if (isItem) {
+            switch (theItem) {
+                case 'symbol':
+                    if (targetUser.canCustomSymbol === true) {
+                        return this.sendReply('This user has already bought that item from the shop... no need for another.');
+                    }
+                    if (targetUser.canCustomSymbol === false) {
+                        matched = true;
+                        this.sendReply(targetUser.name + ' can now use /customsymbol to get a custom symbol.');
+                        targetUser.canCustomSymbol = true;
+                        Rooms.rooms.lobby.add(user.name + ' has stolen custom symbol from the shop!');
+                        targetUser.send(user.name + ' has given you ' + theItem + '! Use /customsymbol [symbol] to add the symbol!');
+                    }
+                    break;
+                case 'custom':
+                    if (targetUser.canCustomAvatar === true) {
+                        return this.sendReply('This user has already bought that item from the shop... no need for another.');
+                    }
+                    if (targetUser.canCustomAvatar === false) {
+                        matched = true;
+                        targetUser.canCustomAvatar = true;
+                        Rooms.rooms.lobby.add(user.name + ' has stolen a custom avatar from the shop!');
+                        targetUser.send(user.name + ' has given you ' + theItem + '!');
+                    }
+                    break;
+                case 'emote':
+                    if (targetUser.canCustomEmote === true) {
+                        return this.sendReply('This user has already bought that item from the shop... no need for another.');
+                    }
+                    if (targetUser.canCustomEmote === false) {
+                        matched = true;
+                        targetUser.canCustomEmote = true;
+                        Rooms.rooms.lobby.add(user.name + ' has stolen a custom emote from the shop!');
+                        targetUser.send(user.name + ' has given you ' + theItem + '!');
+                    }
+                    break;
+                case 'animated':
+                    if (targetUser.canAnimated === true) {
+                        return this.sendReply('This user has already bought that item from the shop... no need for another.');
+                    }
+                    if (targetUser.canCustomAvatar === false) {
+                        matched = true;
+                        targetUser.canCustomAvatar = true;
+                        Rooms.rooms.lobby.add(user.name + ' has stolen a custom avatar from the shop!');
+                        targetUser.send(user.name + ' has given you ' + theItem + '!');
+                    }
+                    break;
+                case 'room':
+                    if (targetUser.canChatRoom === true) {
+                        return this.sendReply('This user has already bought that item from the shop... no need for another.');
+                    }
+                    if (targetUser.canChatRoom === false) {
+                        matched = true;
+                        targetUser.canChatRoom = true;
+                        Rooms.rooms.lobby.add(user.name + ' has stolen a chat room from the shop!');
+                        targetUser.send(user.name + ' has given you ' + theItem + '!');
+                    }
+                    break;
+                case 'trainer':
+                    if (targetUser.canTrainerCard === true) {
+                        return this.sendReply('This user has already bought that item from the shop... no need for another.');
+                    }
+                    if (targetUser.canTrainerCard === false) {
+                        matched = true;
+                        targetUser.canTrainerCard = true;
+                        Rooms.rooms.lobby.add(user.name + ' has stolen a trainer card from the shop!');
+                        targetUser.send(user.name + ' has given you ' + theItem + '!');
+                    }
+                    break;
+                case 'musicbox':
+                    if (targetUser.canMusicBox === true) {
+                        return this.sendReply('This user has already bought that item from the shop... no need for another.');
+                    }
+                    if (targetUser.canMusicBox === false) {
+                        matched = true;
+                        targetUser.canMusicBox = true;
+                        Rooms.rooms.lobby.add(user.name + ' has stolen a music box from the shop!');
+                        targetUser.send(user.name + ' has given you ' + theItem + '!');
+                    }
+                    break;
+                case 'fix':
+                    if (targetUser.canFixItem === true) {
+                        return this.sendReply('This user has already bought that item from the shop... no need for another.');
+                    }
+                    if (targetUser.canFixItem === false) {
+                        matched = true;
+                        targetUser.canFixItem = true;
+                        Rooms.rooms.lobby.add(user.name + ' has stolen the ability to alter a current trainer card or avatar from the shop!');
+                        targetUser.send(user.name + ' has given you the ability to set ' + theItem + '!');
+                    }
+                    break;
+                case 'declare':
+                    if (targetUser.canDecAdvertise === true) {
+                        return this.sendReply('This user has already bought that item from the shop... no need for another.');
+                    }
+                    if (targetUser.canDecAdvertise === false) {
+                        matched = true;
+                        targetUser.canDecAdvertise = true;
+                        Rooms.rooms.lobby.add(user.name + ' has stolen the ability to get a declare from the shop!');
+                        targetUser.send(user.name + ' has given you the ability to set ' + theItem + '!');
+                    }
+                    break;
+                default:
+                    return this.sendReply('Maybe that item isn\'t in the shop yet.');
+            }
+        } else {
+            return this.sendReply('Shop item could not be found, please check /shop for all items - ' + theItem);
+        }
+    },*/
+    /*removeitem: function(target, room, user) {
+        if (!target) return this.parse('/help removeitem');
+        if (!user.can('hotpatch')) return this.sendReply('You do not have enough authority to do this.');
+        target = this.splitTarget(target);
+        var targetUser = this.targetUser;
+        if (!target) return this.parse('/help removeitem');
+        if (!targetUser) {
+            return this.sendReply('User ' + this.targetUsername + ' not found.');
+        }
+        switch (target) {
+            case 'symbol':
+                if (targetUser.canCustomSymbol) {
+                    targetUser.canCustomSymbol = false;
+                    this.sendReply(targetUser.name + ' no longer has a custom symbol ready to use.');
+                    targetUser.send(user.name + ' has removed the custom symbol from you.');
+                } else {
+                    return this.sendReply('They do not have a custom symbol for you to remove.');
+                }
+                break;
+            case 'custombattlesong':
+            case 'battlesong':
+            case 'cbs':
+                if (targetUser.canCustomBattleSong) {
+                    targetUser.canCustomBattleSong = false;
+                    this.sendReply(targetUser.name + 'no longer has a custom battle song ready to use.');
+                    targetUser.send(user.name + ' has removed the custom battle song from you.');
+                } else {
+                    return this.sendReply("They do not have a custom battle song for you to remove.");
+                }
+                break;
+            case 'custom':
+                if (targetUser.canCustomAvatar) {
+                    targetUser.canCustomAvatar = false;
+                    this.sendReply(targetUser.name + ' no longer has a custom avatar ready to use.');
+                    targetUser.send(user.name + ' has removed the custom avatar from you.');
+                } else {
+                    return this.sendReply('They do not have a custom avatar for you to remove.');
+                }
+                break;
+            case 'emote':
+                if (targetUser.canCustomEmote) {
+                    targetUser.canCustomEmote = false;
+                    this.sendReply(targetUser.name + ' no longer has a custom emote ready to use.');
+                    targetUser.send(user.name + ' has removed the custom emote from you.');
+                } else {
+                    return this.sendReply('They do not have a custom emote for you to remove.');
+                }
+                break;
+            case 'animated':
+                if (targetUser.canAnimatedAvatar) {
+                    targetUser.canAnimatedAvatar = false;
+                    this.sendReply(targetUser.name + ' no longer has a animated avatar ready to use.');
+                    targetUser.send(user.name + ' has removed the animated avatar from you.');
+                } else {
+                    return this.sendReply('They do not have an animated avatar for you to remove.');
+                }
+                break;
+            case 'room':
+                if (targetUser.canChatRoom) {
+                    targetUser.canChatRoom = false;
+                    this.sendReply(targetUser.name + ' no longer has a chat room ready to use.');
+                    targetUser.send(user.name + ' has removed the chat room from you.');
+                } else {
+                    return this.sendReply('They do not have a chat room for you to remove.');
+                }
+                break;
+            case 'trainer':
+                if (targetUser.canTrainerCard) {
+                    targetUser.canTrainerCard = false;
+                    this.sendReply(targetUser.name + ' no longer has a trainer card ready to use.');
+                    targetUser.send(user.name + ' has removed the trainer card from you.');
+                } else {
+                    return this.sendReply('They do not have a trainer card for you to remove.');
+                }
+                break;
+            case 'musicbox':
+                if (targetUser.canMusicBox) {
+                    targetUser.canMusicBox = false;
+                    this.sendReply(targetUser.name + ' no longer has a music box ready to use.');
+                    targetUser.send(user.name + ' has removed the music box from you.');
+                } else {
+                    return this.sendReply('They do not have a music box for you to remove.');
+                }
+                break;
+            case 'fix':
+                if (targetUser.canFixItem) {
+                    targetUser.canFixItem = false;
+                    this.sendReply(targetUser.name + ' no longer has the fix to use.');
+                    targetUser.send(user.name + ' has removed the fix from you.');
+                } else {
+                    return this.sendReply('They do not have a trainer card for you to remove.');
+                }
+                break;
+            case 'forcerename':
+            case 'fr':
+                if (targetUser.canForcerename) {
+                    targetUser.canForcerename = false;
+                    this.sendReply(targetUser.name + ' no longer has the forcerename to use.');
+                    targetUser.send(user.name + ' has removed forcerename from you.');
+                } else {
+                    return this.sendReply('They do not have a forcerename for you to remove.');
+                }
+                break;
+            case 'declare':
+                if (targetUser.canDecAdvertise) {
+                    targetUser.canDecAdvertise = false;
+                    this.sendReply(targetUser.name + ' no longer has a declare ready to use.');
+                    targetUser.send(user.name + ' has removed the declare from you.');
+                } else {
+                    return this.sendReply('They do not have a trainer card for you to remove.');
+                }
+                break;
+            default:
+                return this.sendReply('That isn\'t a real item you fool!');
+        }
+    },*/
+    friendcodehelp: function(target, room, user) {
+        if (!this.canBroadcast()) return;
+        this.sendReplyBox('<b>Friend Code Help:</b> <br><br />' +
+            '/friendcode (/fc) [friendcode] - Sets your Friend Code.<br />' +
+            '/getcode (gc) - Sends you a popup of all of the registered user\'s Friend Codes.<br />' +
+            '/deletecode [user] - Deletes this user\'s friend code from the server (Requires %, @, &, ~)<br>' +
+            '<i>--Any questions, PM papew!</i>');
+    },
+    friendcode: 'fc',
+    fc: function(target, room, user, connection) {
+        if (!target) {
+            return this.sendReply("Enter in your friend code. Make sure it's in the format: xxxx-xxxx-xxxx or xxxx xxxx xxxx or xxxxxxxxxxxx.");
+        }
+        var fc = target;
+        fc = fc.replace(/-/g, '');
+        fc = fc.replace(/ /g, '');
+        if (isNaN(fc)) return this.sendReply("The friend code you submitted contains non-numerical characters. Make sure it's in the format: xxxx-xxxx-xxxx or xxxx xxxx xxxx or xxxxxxxxxxxx.");
+        if (fc.length < 12) return this.sendReply("The friend code you have entered is not long enough! Make sure it's in the format: xxxx-xxxx-xxxx or xxxx xxxx xxxx or xxxxxxxxxxxx.");
+        fc = fc.slice(0, 4) + '-' + fc.slice(4, 8) + '-' + fc.slice(8, 12);
+        var codes = fs.readFileSync('config/friendcodes.txt', 'utf8');
+        if (codes.toLowerCase().indexOf(user.name) > -1) {
+            return this.sendReply("Your friend code is already here.");
+        }
+        code.write('\n' + user.name + ': ' + fc);
+        return this.sendReply("Your Friend Code: " + fc + " has been set.");
+    },
+    viewcode: 'gc',
+    getcodes: 'gc',
+    viewcodes: 'gc',
+    vc: 'gc',
+    getcode: 'gc',
+    gc: function(target, room, user, connection) {
+        var codes = fs.readFileSync('config/friendcodes.txt', 'utf8');
+        return user.send('|popup|' + codes);
+    },
+    userauth: function(target, room, user, connection) {
+        var targetId = toId(target) || user.userid;
+        var targetUser = Users.getExact(targetId);
+        var targetUsername = (targetUser ? targetUser.name : target);
+        var buffer = [];
+        var innerBuffer = [];
+        var group = Users.usergroups[targetId];
+        if (group) {
+            buffer.push('Global auth: ' + group.charAt(0));
+        }
+        for (var i = 0; i < Rooms.global.chatRooms.length; i++) {
+            var curRoom = Rooms.global.chatRooms[i];
+            if (!curRoom.auth || curRoom.isPrivate) continue;
+            group = curRoom.auth[targetId];
+            if (!group) continue;
+            innerBuffer.push(group + curRoom.id);
+        }
+        if (innerBuffer.length) {
+            buffer.push('Room auth: ' + innerBuffer.join(', '));
+        }
+        if (targetId === user.userid || user.can('makeroom')) {
+            innerBuffer = [];
+            for (var i = 0; i < Rooms.global.chatRooms.length; i++) {
+                var curRoom = Rooms.global.chatRooms[i];
+                if (!curRoom.auth || !curRoom.isPrivate) continue;
+                var auth = curRoom.auth[targetId];
+                if (!auth) continue;
+                innerBuffer.push(auth + curRoom.id);
+            }
+            if (innerBuffer.length) {
+                buffer.push('Private room auth: ' + innerBuffer.join(', '));
+            }
+        }
+        if (!buffer.length) {
+            buffer.push("No global or room auth.");
+        }
+        buffer.unshift("" + targetUsername + " user auth:");
+        connection.popup(buffer.join("\n\n"));
+    },
+    showpic: function(target, room, user) {
+        if (!target) return this.sendReply('/showpic [url], [size] - Adds a picture to the room. Size of 100 is the width of the room (100%).');
+        if (!room.isPrivate || !room.auth) return this.sendReply('You can only do this in unofficial private rooms.');
+        target = tour.splint(target);
+        var picSize = '';
+        if (target[1]) {
+            if (target[1] < 1 || target[1] > 100) return this.sendReply('Size must be between 1 and 100.');
+            picSize = ' height=' + target[1] + '% width=' + target[1] + '%';
+        }
+        this.add('|raw|<div class="broadcast-blue"><img src=' + target[0] + picSize + '></div>');
+        this.logModCommand(user.name + ' added the image ' + target[0]);
+    },
+    deletecode: function(target, room, user) {
+        if (!target) {
+            return this.sendReply('/deletecode [user] - Deletes the Friend Code of the User.');
+        }
+        t = this;
+        if (!this.can('lock')) return false;
+        fs.readFile('config/friendcodes.txt', 'utf8', function(err, data) {
+            if (err) console.log(err);
+            hi = this;
+            var row = ('' + data).split('\n');
+            match = false;
+            line = '';
+            for (var i = row.length; i > -1; i--) {
+                if (!row[i]) continue;
+                var line = row[i].split(':');
+                if (target === line[0]) {
+                    match = true;
+                    line = row[i];
+                }
+                break;
+            }
+            if (match === true) {
+                var re = new RegExp(line, 'g');
+                var result = data.replace(re, '');
+                fs.writeFile('config/friendcodes.txt', result, 'utf8', function(err) {
+                    if (err) t.sendReply(err);
+                    t.sendReply('The Friendcode ' + line + ' has been deleted.');
+                });
+            } else {
+                t.sendReply('There is no match.');
+            }
+        });
+    },
+
+
+	
 	host: function (target, room, user, connection, cmd) {
 		if (!target) return this.parse('/help host');
 		if (!this.can('rangeban')) return;
@@ -222,170 +1128,6 @@ var commands = exports.commands = {
 	/*********************************************************
 	 * Shortcuts
 	 *********************************************************/
-
-removelb:'removeleaguebadge',
-removeleaguebadge: function(target, room, user) {
-        if (!this.can('hotpatch')) return false;
-        target = this.splitTarget(target);
-        var targetUser = this.targetUser;
-        if (!target) return this.sendReply('/removelb [user], [badge] - Removes a Leaguebadge from a user.');
-        if (!targetUser) return this.sendReply('There is no user named ' + this.targetUsername + '.');
-        var self = this;
-        var type_of_badges = ['cascadebadge', 'bot', 'thunderbadge', 'vip', 'artist', 'mod', 'leader', 'champ', 'rainbowbadge', 'comcun', 'twinner', 'goodra', 'league', 'boulderbadge'];
-        if (type_of_badges.indexOf(target) > -1 == false) return this.sendReply('The badge ' + target + ' is not a valid badge.');
-        fs.readFile('leaguebadges.txt', 'utf8', function(err, data) {
-            if (err) console.log(err);
-            var match = false;
-            var currentbadges = '';
-            var row = ('' + data).split('\n');
-            var line = '';
-            for (var i = row.length; i > -1; i--) {
-                if (!row[i]) continue;
-                var split = row[i].split(':');
-                if (split[0] == targetUser.userid) {
-                    match = true;
-                    currentbadges = split[1];
-                    line = row[i];
-                }
-            }
-            if (match == true) {
-                if (currentbadges.indexOf(target) > -1 == false) return self.sendReply(currentbadges); //'The user '+targetUser+' does not have the badge.');
-                var re = new RegExp(line, 'g');
-                currentbadges = currentbadges.replace(target, '');
-                var newdata = data.replace(re, targetUser.userid + ':' + currentbadges);
-                fs.writeFile('leaguebadges.txt', newdata, 'utf8', function(err, data) {
-                    if (err) console.log(err);
-                    return self.sendReply('You have removed the badge ' + target + ' from the user ' + targetUser + '.');
-                });
-            } else {
-                return self.sendReply('There is no match for the user ' + targetUser + '.');
-            }
-        });
-    },
-       
-           givelb:'giveleaguebadge',
-    giveleaguebadge: function(target, room, user) {
-        if (!this.can('declare', null, room)) return this.sendReply('You dont have access to this command.');
-       
-        target = this.splitTarget(target);
-        var targetUser = this.targetUser;
-        if (!targetUser) return this.sendReply('There is no user named ' + this.targetUsername + '.');
-        if (!target) return this.sendReply('/givelb [user], [badge] - Gives a Leaguebadge to a user. Requires: &~');
-        var self = this;
-        var type_of_badges = ['cascadebadge', 'stormbadge', 'thunderbadge', 'fogbadge', 'volcanobadge', 'hivebadge', 'marshbadge', 'zephyrbadge', 'rainbowbadge', 'soulbadge', 'plainbadge ', 'earthbadge', 'boulderbadge'];
-        if (type_of_badges.indexOf(target) > -1 == false) return this.sendReply('Ther is no badge named ' + target + '.');
-        fs.readFile('leaguebadges.txt', 'utf8', function(err, data) {
-            if (err) console.log(err);
-            var currentbadges = '';
-            var line = '';
-            var row = ('' + data).split('\n');
-            var match = false;
-            for (var i = row.length; i > -1; i--) {
-                if (!row[i]) continue;
-                var split = row[i].split(':');
-                if (split[0] == targetUser.userid) {
-                    match = true;
-                    currentbadges = split[1];
-                    line = row[i];
-                }
-            }
-            if (match == true) {
-                if (currentbadges.indexOf(target) > -1) return self.sendReply('The user ' + targerUser + ' already has the badge ' + target + '.');
-                var re = new RegExp(line, 'g');
-                var newdata = data.replace(re, targetUser.userid + ':' + currentbadges + target);
-                fs.writeFile('leaguebadges.txt', newdata, function(err, data) {
-                    if (err) console.log(err);
-                    self.sendReply('You have given the badge ' + target + ' to the user ' + targetUser + '.');
-                    targetUser.send('You have recieved the badge ' + target + ' from the user ' + user.userid + '.');
-                    room.addRaw(targetUser + ' has recieved the ' + target + ' badge from ' + user.name);
-                });
-            } else {
-                fs.appendFile('leaguebadges.txt', '\n' + targetUser.userid + ':' + target, function(err) {
-                    if (err) console.log(err);
-                    self.sendReply('You have given the badge ' + target + ' to the user ' + targetUser + '.');
-                    targetUser.send('You have recieved the badge ' + target + ' from the user ' + user.userid + '.');
-                });
-            }
-        })
-    },
-         lblist:'leaguebadgelist',
-    leaguebadgelist: function(target, room, user) {
-        if (!this.canBroadcast()) return;
-         var boulderbadge = '<img src= "http://vignette1.wikia.nocookie.net/pokemon/images/2/24/Boulderbadge.png/revision/latest?cb=20100418182312"height="15" width="15" title="Rock GymLeader 1G">';
-        var cascadebadge = '<img src= "http://vignette4.wikia.nocookie.net/pokemon/images/4/4d/Cascadebadge.png/revision/latest?cb=20140907085215"height="15" width="15" title="Water Badge 1G">';
-        var thunderbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/a/a8/Thunderbadge.png/revision/latest?cb=20100418182457" height="15" width="15" title="Thunder badge 1G">';
-        var rainbowbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b5/Rainbow_Badge.png/revision/latest?cb=20141009005938"height="15" width="15"  title="rainbow badge 1G">';
-        var soulbadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/6/64/Soulbadge.png/revision/latest?cb=20100418182548"height="15" width="15" title="Soul badge 1G">';
-        var marshbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/1/1c/Marshbadge.png/revision/latest?cb=20100418182532"height="15" width="15" title="Marsh Leader 1G">';
-        var volcanobadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/d/d9/Volcanobadge.png/revision/latest?cb=20081229171449"height="15" width="15" title="Volcano Badge 1G">';
-        var earthbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/c/cc/Earthbadge.png/revision/latest?cb=20101029071826"height="15" width="15" title="Earth badge 1G">';
-        var zephyrbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b6/Zephyrbadge.png/revision/latest?cb=20081229171509"height="15" width="15" title="Zephyr Badge 2G">';
-        var hivebadge = '<img src="http://vignette1.wikia.nocookie.net/pokemon/images/d/d0/Hivebadge.png/revision/latest?cb=20081229171030"height="15" width="15" title="Hive Badge 2G">';
-        var Plainbadge = '<img src="http://vignette4.wikia.nocookie.net/pokemon/images/4/42/Plainbadge.png/revision/latest?cb=20081229171221"height="15" width="15" title="Plane Badge 2G">';
-        var fogbadge = '<img src="http://vignette3.wikia.nocookie.net/pokemon/images/4/4f/Fogbadge.png/revision/latest?cb=20081229170948"height="15" width="15" title="Fog Badge 2G">';
-        var stormbadge = '<img src="http://vignette4.wikia.nocookie.net/pokemon/images/c/ca/Stormbadge.png/revision/latest?cb=20081229171417"height="15" width="15" title="Storm Badge 2G">';
-        return this.sendReplyBox('<b>List of Fireball League Badges</b>:<br>' + boulderbadge + '  ' + cascadebadge + '    ' + thunderbadge + '  ' + rainbowbadge + '   ' + comcun + '    ' + mod + '    ' + leader + '    ' + league + '    ' + champ + '    ' + artist + '    ' + twinner + '    ' + vip + '    ' + bot + ' <br>--Hover over them to see the meaning of each.<br>--Get a badge and get a FREE custom avatar!<br>--Click <a href="http://goldserver.weebly.com/badges.html">here</a> to find out more about how to get a badge.');
-    },
-    
-    lb: 'leaguebadge',
-    lbadges: 'leaguebadge',
-    leaguebadge: function(target, room, user) {
-        if (!this.canBroadcast()) return;
-        if (target == '') target = user.userid;
-        target = this.splitTarget(target);
-        var targetUser = this.targetUser;
-        var matched = false;
-        if (!targetUser) return false;
-         var boulderbadge = 'http://vignette1.wikia.nocookie.net/pokemon/images/2/24/Boulderbadge.png/revision/latest?cb=20100418182312"height="15" width="15" title="Rock GymLeader 1g">';
-        var cascadebadge = '<img src= "http://vignette4.wikia.nocookie.net/pokemon/images/4/4d/Cascadebadge.png/revision/latest?cb=20140907085215"height="15" width="15" title="Water Badge">';
-        var thunderbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/a/a8/Thunderbadge.png/revision/latest?cb=20100418182457" height="15" width="15" title="Thunder badge">';
-            var rainbowbadge = '<img src="http://vignette2.wikia.nocookie.net/pokemon/images/b/b5/Rainbow_Badge.png/revision/latest?cb=20141009005938" height="15" width="15" title="rainbow badge">';
-        var comcun = '<img src="http://www.smogon.com/media/forums/images/badges/cc.png" title="Community Contributor">';
-        var leader = '<img src="http://www.smogon.com/media/forums/images/badges/aop.png" title="Server Leader">';
-        var mod = '<img src="http://www.smogon.com/media/forums/images/badges/pyramid_king.png" title="Exceptional Staff Member">';
-        var league = '<img src="http://www.smogon.com/media/forums/images/badges/forumsmod.png" title="Successful League Owner">';
-        var srf = '<img src="http://www.smogon.com/media/forums/images/badges/forumadmin_alum.png" title="Goodra League Champion">';
-        var artist = '<img src="http://www.smogon.com/media/forums/images/badges/ladybug.png" title="Artist">';
-        var twinner = '<img src="http://www.smogon.com/media/forums/images/badges/spl.png" title="Badge Tournament Winner">';
-        var vip = '<img src="http://www.smogon.com/media/forums/images/badges/zeph.png" title="VIP">';
-        var bot = '<img src="http://www.smogon.com/media/forums/images/badges/mind.png" title="Gold Bot Hoster">';
-        var self = this;
-        fs.readFile('leaguebadges.txt', 'utf8', function(err, data) {
-            if (err) console.log(err);
-            var row = ('' + data).split('\n');
-            var match = false;
-            var badges;
-            for (var i = row.length; i > -1; i--) {
-                if (!row[i]) continue;
-                var split = row[i].split(':');
-                if (split[0] == targetUser.userid) {
-                    match = true;
-                    currentbadges = split[1];
-                }
-            }
-            if (match == true) {
-                var leaguebadgelist = '';
-                if (currentbadges.indexOf('boulderbadge') > -1) leaguebadgelist += ' ' + boulderbadge;
-                if (currentbadges.indexOf('cascadebadge') > -1) leaguebadgelist += ' ' + cascadebadge;
-                if (currentbadges.indexOf('thunderbadge') > -1) leaguebadgelist += ' ' + thunderbadge;
-                if (currentbadges.indexOf('rainbowbadge') > -1) leaguebadgelist += ' ' + rainbowbadge;
-                if (currentbadges.indexOf('comcun') > -1) leaguebadgelist += ' ' + comcun;
-                if (currentbadges.indexOf('leader') > -1) leaguebadgelist += ' ' + leader;
-                if (currentbadges.indexOf('mod') > -1) leaguebadgelist += ' ' + mod;
-                if (currentbadges.indexOf('league') > -1) leaguebadgelist += ' ' + league;
-                if (currentbadges.indexOf('champ') > -1) leaguebadgelist += ' ' + champ;
-                if (currentbadges.indexOf('artist') > -1) leaguebadgelist += ' ' + artist;
-                if (currentbadges.indexOf('twinner') > -1) leaguebadgelist += ' ' + twinner;
-                if (currentbadges.indexOf('vip') > -1) leaguebadgelist += ' ' + vip;
-                if (currentbadges.indexOf('bot') > -1) leaguebadgelist += ' ' + bot;
-                self.sendReplyBox(targetUser.userid + "'s badges: " + leaguebadgelist);
-                room.update();
-            } else {
-                self.sendReplyBox('User ' + targetUser.userid + ' has no League badges.');
-                room.update();
-            }
-        });
-    },
 
 	inv: 'invite',
 	invite: function (target, room, user) {
